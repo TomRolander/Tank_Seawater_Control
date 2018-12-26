@@ -402,7 +402,7 @@ void SDLogging(bool bShowLCDMessage, const __FlashStringHelper*status)
     fileSDCard.print(":");
     fileSDCard.print(now.second(), DEC);
     fileSDCard.print(",");
-    SDPrintBinary(digitalOutputState,6);
+    SDPrintBinary(digitalOutputState ^ DOUT4,6);  // toggle sense of flashing light state
     fileSDCard.print(",");
     SDPrintBinary(digitalInputState_Saved,4);
     fileSDCard.print(",");
