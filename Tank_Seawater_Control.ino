@@ -11,11 +11,15 @@
 #define MODIFIED "2018-12-24"
 #define VERSION "0.2"
 
+#define LED_VERSION true
+
 #define DELAY_DIN_CHECKING_SEC  5
 #define DELAY_LOGGING_MIN 1
 
 long tickCounterSec = 0;
 int  nextLoggingMin = 0;
+
+long UVtimer = 0;
 
 bool bSDLogging = true;
 
@@ -77,9 +81,9 @@ Din3  Din2  Din1  Din0    Dout4 Dout3 Dout2 Dout1 Dout0
 #define DOUT2 B00000100   // Discharge / Output Pump
 #define DOUT3 B00001000   // UV Sterilizers
 #define DOUT4 B00010000   // Flashing Light
-#define DOUT5 B00100000
+#define DOUT5 B00100000   // Green all OK LED
 
-int digitalOutputState = DOUT0 | DOUT1 | DOUT2 | DOUT3 | DOUT5;  // Value to show in the 6 LEDs and relay drivers
+int digitalOutputState = DOUT0 | DOUT1 | DOUT2 | DOUT3 | DOUT4 | DOUT5;  // Value to show in the 6 LEDs and relay drivers
 
 
 
@@ -194,6 +198,7 @@ void loop() {
       bLogged = true;
       bSDLogging = true;
       digitalInputState_Saved = digitalInputState_New;
+      digitalOutputState = digitalOutputState & (~DOUT5);     // send zero to DO5 to turn off green LED
       switch (digitalInputState_New)
       {
         case (B00000000):   // Water level between the high and low levels, this is the normal case
@@ -201,72 +206,80 @@ void loop() {
                             //       or closed if high level switch hit last
           flashing = false;
           digitalOutputState = digitalOutputState | DOUT1;    // send one to DO1 to open inlet valve
-          digitalOutputState = digitalOutputState | DOUT5;    // send one to DO5 to show green LED
+          digitalOutputState = digitalOutputState | DOUT4;    // send one to DO5 to turn off flashing
+          digitalOutputState = digitalOutputState | DOUT5;    // send one to DO5 to turn on green LED
 
-          lcd.setCursor(0, 0);
-          lcd.print(F("I=1 O=1 BV=1 UV1"));
-          lcd.setCursor(0, 1);
+          LCDOutStatusUpdate();
           SDLogging(true, F("Tank Level Norml"));
           break;
           
         case (B00000001):   // Pump shut off check float switches
           flashing = true;
           digitalOutputState = digitalOutputState & (~DOUT2); // send zero to DO2 to turn off the pump
+          digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO1 to open bypass valve
           digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve
-          lcd.setCursor(0, 0);
-          lcd.print(F("I=1 O=0 BV=1 UV1"));
-          lcd.setCursor(0, 1);
+          digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
+          LCDOutStatusUpdate();
           SDLogging(true, F("FLOAT SWITCH ERR"));
           break;
           
         case (B00000010):   // Tank level low opening bypass
           flashing = false;
-          digitalOutputState = digitalOutputState | DOUT0 | DOUT1;
-
-          lcd.clear();
-          lcd.setCursor(0, 0);
-          lcd.print(F("I=1 O=0 BV=1 UV1"));
-          lcd.setCursor(0, 1);
+          digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO1 to open bypass valve
+          digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve
+          digitalOutputState = digitalOutputState | DOUT4;    // send one to DO5 to turn off flashing
+          LCDOutStatusUpdate();
           SDLogging(true, F("Tank Level Low"));
           break;
           
         case (B00000011):   // Tank very low shutting off pump
           flashing = true;
-          digitalOutputState = DOUT0 | DOUT1 | DOUT2 | DOUT4;
-          
-          lcd.setCursor(0, 0);
-          lcd.print(F("I=1 O=0 BV=1 UV1"));
-          lcd.setCursor(0, 1);
+          digitalOutputState = digitalOutputState & (~DOUT2); // send zero to DO2 to turn off the pump
+          digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO1 to open bypass valve
+          digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve      
+          digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
+          LCDOutStatusUpdate();
           SDLogging(true, F("TNK LVL VERY LOW"));
           break;
           
         case (B00000100):   // Tank level high closing bypass
           flashing = false;
-          digitalOutputState = DOUT0 | DOUT1;
-
-          lcd.setCursor(0, 0);
-          lcd.print(F("I=1 O=0 BV=0 UV1"));
-          lcd.setCursor(0, 1);
+          digitalOutputState = digitalOutputState | DOUT2; // send one to DO2 to turn on the pump
+          digitalOutputState = digitalOutputState | DOUT3; // send one to DO3 to turn on the UV
+          digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
+          digitalOutputState = digitalOutputState | DOUT4;    // send one to DO5 to turn off flashing
+          UVtimer = 0;
+          LCDOutStatusUpdate();
           SDLogging(true, F("Tank Level High"));
+          break;
+          
+        case (B00001000):   // Tank very high shutting off pump
+          flashing = true;
+          digitalOutputState = digitalOutputState | DOUT2; // send one to DO2 to turn on the pump
+          digitalOutputState = digitalOutputState | DOUT3; // send one to DO3 to turn on the UV
+          digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
+          digitalOutputState = digitalOutputState & (~DOUT1); // send zero to DO0 to close input valve
+          digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
+          LCDOutStatusUpdate();
+          SDLogging(true, F("FLOAT SWITCH ERR"));
           break;
           
         case (B00001100):   // Tank very high shutting off pump
           flashing = true;
-          digitalOutputState = DOUT0 | DOUT1 | DOUT2 | DOUT4;
-          
-          lcd.setCursor(0, 0);
-          lcd.print(F("I=0 O=0 BV=1 UV1"));
-          lcd.setCursor(0, 1);
-          SDLogging(true, F("TNK LVL VRY HIGH"));
+          digitalOutputState = digitalOutputState | DOUT2; // send one to DO2 to turn on the pump
+          digitalOutputState = digitalOutputState | DOUT3; // send one to DO3 to turn on the UV
+          digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
+          digitalOutputState = digitalOutputState & (~DOUT1); // send zero to DO0 to close input valve
+          digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
+          LCDOutStatusUpdate();
+          //SDLogging(true, F("TNK LVL VRY HIGH"));
+          SDLogging(true, F("TNK VRY HI-CkFlt"));
           break;
           
         default:   // Float switch error shut off pump
-          flashing = true;
-          digitalOutputState = DOUT4;
-          
-          lcd.setCursor(0, 0);
-          lcd.print(F("I=1 O=0 BV=1 UV1"));
-          lcd.setCursor(0, 1);
+          flashing = true;         
+          digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
+          LCDOutStatusUpdate();
           SDLogging(true, F("FLOAT SWITCH ERR"));
           break;
       }
@@ -356,8 +369,7 @@ void SDLogging(bool bShowLCDMessage, const __FlashStringHelper*status)
   {
     lcd.setCursor(0, 1);
     lcd.print(status);
-  }
-      
+  }    
   SD.end();
   if (!SD.begin(chipSelectSDCard)) 
   {
@@ -421,10 +433,40 @@ void Setup_74HC595()
   SetDigitalOutputState();
 }
 
+void LCDOutStatusUpdate()
+{
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(F("I="));
+  if ((digitalOutputState & DOUT1) == 0)
+    lcd.write('0');
+  else
+    lcd.write('1');
+  lcd.print(F(" O="));
+  if ((digitalOutputState & DOUT2) == 0)
+    lcd.write('0');
+  else
+    lcd.write('1');
+  lcd.print(F(" BV="));
+  if ((digitalOutputState & DOUT0) == 0)
+    lcd.write('0');
+  else
+    lcd.write('1');
+  lcd.print(F(" UV"));
+  if ((digitalOutputState & DOUT3) == 0)
+    lcd.write('0');
+  else
+    lcd.write('1');  
+}
+
 void SetDigitalOutputState()
 {
+  int iOutput = digitalOutputState;
+#if LED_VERSION
+  iOutput = iOutput ^ DOUT4;
+#endif
   digitalWrite(latchPin74HC595, LOW);          //Pull latch LOW to start sending data
-  shiftOut(dataPin74HC595, clockPin74HC595, MSBFIRST, digitalOutputState);         //Send the data
+  shiftOut(dataPin74HC595, clockPin74HC595, MSBFIRST, iOutput);         //Send the data
   digitalWrite(latchPin74HC595, HIGH);         //Pull latch HIGH to stop sending data
 }
 
