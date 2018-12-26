@@ -8,8 +8,8 @@
   created 2018
   by Tom Rolander
 */
-#define MODIFIED "2018-12-24"
-#define VERSION "0.2"
+#define MODIFIED "2018-12-26"
+#define VERSION "0.3"
 
 #define LED_VERSION true
 
@@ -169,7 +169,7 @@ void setup() {
 
   // Initial state display in LCD
   lcd.setCursor(0, 0);
-  lcd.print(F("I=1 O=1 BV=1 UV1"));
+  lcd.print(F("UV=1 O=1 I=1 B=1"));
   lcd.setCursor(0, 1);
   lcd.print(F("Tank Level Norml"));
   //SetupSDCardSwitch();
@@ -437,26 +437,26 @@ void LCDOutStatusUpdate()
 {
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print(F("I="));
-  if ((digitalOutputState & DOUT1) == 0)
+  lcd.print(F("UV="));
+  if ((digitalOutputState & DOUT3) == 0)
     lcd.write('0');
   else
-    lcd.write('1');
+    lcd.write('1');  
   lcd.print(F(" O="));
   if ((digitalOutputState & DOUT2) == 0)
     lcd.write('0');
   else
     lcd.write('1');
-  lcd.print(F(" BV="));
+  lcd.print(F(" I="));
+  if ((digitalOutputState & DOUT1) == 0)
+    lcd.write('0');
+  else
+    lcd.write('1');
+  lcd.print(F(" B="));
   if ((digitalOutputState & DOUT0) == 0)
     lcd.write('0');
   else
     lcd.write('1');
-  lcd.print(F(" UV"));
-  if ((digitalOutputState & DOUT3) == 0)
-    lcd.write('0');
-  else
-    lcd.write('1');  
 }
 
 void SetDigitalOutputState()
