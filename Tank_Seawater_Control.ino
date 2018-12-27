@@ -15,11 +15,14 @@
 
 #define DELAY_DIN_CHECKING_SEC  5
 #define DELAY_LOGGING_MIN 1
+#define DELAY_UVTIMER_SEC 900
 
 long tickCounterSec = 0;
 int  nextLoggingMin = 0;
 
-long UVtimer = 0;
+int UVtimer = 0;
+int UVtimerMax = DELAY_UVTIMER_SEC / DELAY_DIN_CHECKING_SEC;
+
 
 bool bSDLogging = true;
 
@@ -221,6 +224,7 @@ void loop() {
           digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
           LCDOutStatusUpdate();
           SDLogging(true, F("FLOAT SWITCH ERR"));
+          UVtimer = UVtimer + 1;
           break;
           
         case (B00000010):   // Tank level low opening bypass
@@ -240,6 +244,7 @@ void loop() {
           digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
           LCDOutStatusUpdate();
           SDLogging(true, F("TNK LVL VERY LOW"));
+          UVtimer = UVtimer + 1;
           break;
           
         case (B00000100):   // Tank level high closing bypass
@@ -248,9 +253,9 @@ void loop() {
           digitalOutputState = digitalOutputState | DOUT3; // send one to DO3 to turn on the UV
           digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
           digitalOutputState = digitalOutputState | DOUT4;    // send one to DO5 to turn off flashing
-          UVtimer = 0;
           LCDOutStatusUpdate();
           SDLogging(true, F("Tank Level High"));
+          UVtimer = 0;
           break;
           
         case (B00001000):   // Tank very high shutting off pump
@@ -262,6 +267,7 @@ void loop() {
           digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
           LCDOutStatusUpdate();
           SDLogging(true, F("FLOAT SWITCH ERR"));
+          UVtimer = 0;
           break;
           
         case (B00001100):   // Tank very high shutting off pump
@@ -274,6 +280,7 @@ void loop() {
           LCDOutStatusUpdate();
           //SDLogging(true, F("TNK LVL VRY HIGH"));
           SDLogging(true, F("TNK VRY HI-CkFlt"));
+          UVtimer = 0;
           break;
           
         default:   // Float switch error shut off pump
@@ -283,6 +290,13 @@ void loop() {
           SDLogging(true, F("FLOAT SWITCH ERR"));
           break;
       }
+
+      if (UVtimer > 180)
+      {
+        digitalOutputState = digitalOutputState & (~DOUT3); // send zero to DO3 to turn off UV
+        flashing = true;         
+      }
+      
       SetDigitalOutputState();
     }
   }
