@@ -183,7 +183,14 @@ void setup() {
 void loop() {
   bool bLogged = false;
   delay(1000);
-  DateTime now = rtc.now();    
+  DateTime now = rtc.now();
+   
+  lcd.setCursor(13,1);
+  if ((tickCounterSec & B00000001) == B00000001)
+     lcd.print(":");
+  else
+     lcd.print(" ");
+     
   if (flashing)
   {
     if ((tickCounterSec & B00000001) == B00000001)
@@ -213,7 +220,7 @@ void loop() {
           digitalOutputState = digitalOutputState | DOUT5;    // send one to DO5 to turn on green LED
 
           LCDOutStatusUpdate();
-          SDLogging(true, F("Tank Level Norml"));
+          SDLogging(true, F("Tnk Normal"));
           break;
           
         case (B00000001):   // Pump shut off check float switches
@@ -223,7 +230,7 @@ void loop() {
           digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve
           digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
           LCDOutStatusUpdate();
-          SDLogging(true, F("FLOAT SWITCH ERR"));
+          SDLogging(true, F("FLT SW ERR"));
           UVtimer = UVtimer + 1;
           break;
           
@@ -233,7 +240,7 @@ void loop() {
           digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve
           digitalOutputState = digitalOutputState | DOUT4;    // send one to DO5 to turn off flashing
           LCDOutStatusUpdate();
-          SDLogging(true, F("Tank Level Low"));
+          SDLogging(true, F("lo  Opn Bp"));
           break;
           
         case (B00000011):   // Tank very low shutting off pump
@@ -243,7 +250,7 @@ void loop() {
           digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve      
           digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
           LCDOutStatusUpdate();
-          SDLogging(true, F("TNK LVL VERY LOW"));
+          SDLogging(true, F("LO! Pm Off"));
           UVtimer = UVtimer + 1;
           break;
           
@@ -254,7 +261,7 @@ void loop() {
           digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
           digitalOutputState = digitalOutputState | DOUT4;    // send one to DO5 to turn off flashing
           LCDOutStatusUpdate();
-          SDLogging(true, F("Tank Level High"));
+          SDLogging(true, F("hi  Cls Bp"));
           UVtimer = 0;
           break;
           
@@ -266,7 +273,7 @@ void loop() {
           digitalOutputState = digitalOutputState & (~DOUT1); // send zero to DO0 to close input valve
           digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
           LCDOutStatusUpdate();
-          SDLogging(true, F("FLOAT SWITCH ERR"));
+          SDLogging(true, F("FLT SW ERR"));
           UVtimer = 0;
           break;
           
@@ -279,7 +286,7 @@ void loop() {
           digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
           LCDOutStatusUpdate();
           //SDLogging(true, F("TNK LVL VRY HIGH"));
-          SDLogging(true, F("TNK VRY HI-CkFlt"));
+          SDLogging(true, F("HI! Ck Flt"));
           UVtimer = 0;
           break;
           
@@ -287,11 +294,11 @@ void loop() {
           flashing = true;         
           digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
           LCDOutStatusUpdate();
-          SDLogging(true, F("FLOAT SWITCH ERR"));
+          SDLogging(true, F("FLT SW ERR"));
           break;
       }
 
-      if (UVtimer > 180)
+      if (UVtimer > UVtimerMax)
       {
         digitalOutputState = digitalOutputState & (~DOUT3); // send zero to DO3 to turn off UV
         flashing = true;         
@@ -374,21 +381,29 @@ void SetupSDCardOperations()
   lcd.print(F("*** STATUS ***  "));
   lcd.setCursor(0, 1);
   lcd.print(F("SD Init Finish  "));
-  SDLogging(false, F("Start Up"));
+  SDLogging(false, F("Start Up  "));
 }
 
 void SDLogging(bool bShowLCDMessage, const __FlashStringHelper*status)
 {
+  DateTime now = rtc.now();
+      
   if (bShowLCDMessage)
   {
     lcd.setCursor(0, 1);
     lcd.print(status);
+
+    lcd.setCursor(10,1);
+    lcd.print(" ");
+    LCDPrintTwoDigits(now.hour());
+    lcd.setCursor(14,1);
+    LCDPrintTwoDigits(now.minute());
   }    
   SD.end();
   if (!SD.begin(chipSelectSDCard)) 
   {
     lcd.setCursor(0, 0);
-    lcd.print(F("*** ERROR ***   "));
+    lcd.print(F("*** SD ERROR ***"));
     lcd.setCursor(0, 1);
     lcd.print(F("SD Logging Fail "));
     bSDLogging = false;
@@ -402,8 +417,6 @@ void SDLogging(bool bShowLCDMessage, const __FlashStringHelper*status)
   // if the file opened okay, write to it:
   if (fileSDCard) 
   {
-    DateTime now = rtc.now();
-      
     fileSDCard.print(now.year(), DEC);
     fileSDCard.print("/");
     fileSDCard.print(now.month(), DEC);
@@ -449,7 +462,7 @@ void Setup_74HC595()
 
 void LCDOutStatusUpdate()
 {
-  lcd.clear();
+//  lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print(F("UV="));
   if ((digitalOutputState & DOUT3) == 0)
