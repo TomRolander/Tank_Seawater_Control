@@ -15,7 +15,8 @@
 
 #define DELAY_DIN_CHECKING_SEC  5
 #define DELAY_LOGGING_MIN 1
-#define DELAY_UVTIMER_SEC 900
+//#define DELAY_UVTIMER_SEC 900
+#define DELAY_UVTIMER_SEC 90
 
 long tickCounterSec = 0;
 int  nextLoggingMin = 0;
@@ -180,28 +181,18 @@ void setup() {
 
 void loop() {
   bool bLogged = false;
+  const __FlashStringHelper *cStatus;
   delay(1000);
   DateTime now = rtc.now();
 
-/*
-  if (bSDLogging)
-  {
-    lcd.setCursor(13,1);
-    if ((tickCounterSec & B00000001) == B00000001)
-       lcd.print(":");
-    else
-       lcd.print(" ");
-  }
-*/
   if ((tickCounterSec % DELAY_DIN_CHECKING_SEC) == 0)
   {
   // Sample digital inputs and set digital outputs
     digitalInputState_New = SampleDigitalInputs();
-    if ((digitalInputState_New != digitalInputState_Saved) || (bSDLogging == false))
+    //if ((digitalInputState_New != digitalInputState_Saved) || (bSDLogging == false))
     {
       bLogged = true;
       bSDLogging = true;
-      digitalInputState_Saved = digitalInputState_New;
       digitalOutputState = digitalOutputState & (~DOUT5);     // send zero to DO5 to turn off green LED
       switch (digitalInputState_New)
       {
@@ -212,8 +203,7 @@ void loop() {
           digitalOutputState = digitalOutputState | DOUT4;    // send one to DO5 to turn off flashing
           digitalOutputState = digitalOutputState | DOUT5;    // send one to DO5 to turn on green LED
 
-          LCDOutStatusUpdate();
-          SDLogging(true, F("Tnk Normal"));
+          cStatus = F("Tnk Normal");
           break;
           
         case (B00000001):   // Pump shut off check float switches
@@ -221,17 +211,15 @@ void loop() {
           digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve
           digitalOutputState = digitalOutputState & (~DOUT2); // send zero to DO2 to turn off the pump
           digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
-          LCDOutStatusUpdate();
-          SDLogging(true, F("FLT SW ERR"));
+          cStatus = F("FLT SW ERR");
           UVtimer = UVtimer + 1;
           break;
           
         case (B00000010):   // Tank level low opening bypass
           digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO1 to open bypass valve
           digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve
-          //digitalOutputState = digitalOutputState | DOUT4;    // send one to DO4 to turn off flashing
-          LCDOutStatusUpdate();
-          SDLogging(true, F("Lo  Opn Bp"));
+          //digitalOutputState = digitalOutputState | DOUT4;  // send one to DO4 to turn off flashing
+          cStatus = F("Lo  Opn Bp");
           break;
           
         case (B00000011):   // Tank very low shutting off pump
@@ -239,59 +227,63 @@ void loop() {
           digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve      
           digitalOutputState = digitalOutputState & (~DOUT2); // send zero to DO2 to turn off the pump
           digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
-          LCDOutStatusUpdate();
-          SDLogging(true, F("LO! Pm Off"));
+          cStatus = F("LO! Pm Off");
           UVtimer = UVtimer + 1;
           break;
           
         case (B00000100):   // Tank level high closing bypass
           digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
-          digitalOutputState = digitalOutputState | DOUT2; // send one to DO2 to turn on the pump
-          digitalOutputState = digitalOutputState | DOUT3; // send one to DO3 to turn on the UV
-          //digitalOutputState = digitalOutputState | DOUT4;    // send one to DO4 to turn off flashing
-          LCDOutStatusUpdate();
-          SDLogging(true, F("Hi  Cls Bp"));
+          digitalOutputState = digitalOutputState | DOUT2;    // send one to DO2 to turn on the pump
+          digitalOutputState = digitalOutputState | DOUT3;    // send one to DO3 to turn on the UV
+          //digitalOutputState = digitalOutputState | DOUT4;  // send one to DO4 to turn off flashing
+          cStatus = F("Hi  Cls Bp");
           UVtimer = 0;
           break;
           
         case (B00001000):   // Tank very high shutting off pump
           digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
           digitalOutputState = digitalOutputState & (~DOUT1); // send zero to DO0 to close input valve
-          digitalOutputState = digitalOutputState | DOUT2; // send one to DO2 to turn on the pump
-          digitalOutputState = digitalOutputState | DOUT3; // send one to DO3 to turn on the UV
+          digitalOutputState = digitalOutputState | DOUT2;    // send one to DO2 to turn on the pump
+          digitalOutputState = digitalOutputState | DOUT3;    // send one to DO3 to turn on the UV
           digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
-          LCDOutStatusUpdate();
-          SDLogging(true, F("FLT SW ERR"));
+          cStatus = F("FLT SW ERR");
           UVtimer = 0;
           break;
           
         case (B00001100):   // Tank very high shutting off pump
           digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
           digitalOutputState = digitalOutputState & (~DOUT1); // send zero to DO0 to close input valve
-          digitalOutputState = digitalOutputState | DOUT2; // send one to DO2 to turn on the pump
-          digitalOutputState = digitalOutputState | DOUT3; // send one to DO3 to turn on the UV
+          digitalOutputState = digitalOutputState | DOUT2;    // send one to DO2 to turn on the pump
+          digitalOutputState = digitalOutputState | DOUT3;    // send one to DO3 to turn on the UV
           digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
-          LCDOutStatusUpdate();
-          //SDLogging(true, F("TNK LVL VRY HIGH"));
-          SDLogging(true, F("HI! CkFilt"));
+          cStatus = F("HI! CkFilt");
           UVtimer = 0;
           break;
           
         default:   // Float switch error shut off pump
           digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
-          LCDOutStatusUpdate();
-          SDLogging(true, F("FLT SW ERR"));
+          cStatus = F("FLT SW ERR");
           break;
       }
-
-      if (UVtimer > UVtimerMax)
-      {
-        digitalOutputState = digitalOutputState & (~DOUT3); // send zero to DO3 to turn off UV
-        digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
-      }
-      
-//      SetDigitalOutputState();
     }
+
+    LCDOutStatusUpdate();
+    if ((digitalInputState_New != digitalInputState_Saved) || (bSDLogging == false))
+    {
+      digitalInputState_Saved = digitalInputState_New;
+      SDLogging(true, cStatus);
+    }
+    
+    if (UVtimer > UVtimerMax)
+    {
+      if ((digitalOutputState & DOUT3) == DOUT3)
+      {
+        digitalOutputState = digitalOutputState & (~DOUT3);   // send zero to DO3 to turn off UV
+        digitalOutputState = digitalOutputState & (~DOUT4);   // send zero to DO4 to turn on flashing
+        LCDOutStatusUpdate();
+        SDLogging(true, F("UV is OFF "));
+      }
+    }    
   }
 
   SetDigitalOutputState();
