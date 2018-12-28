@@ -98,8 +98,6 @@ const int rs = 4, en = 5, d4 = 9, d5 = 8, d6 = 7, d7 = 6;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
 
-bool flashing = false;
-
 int digitalInputState_Saved = B11111111;
 int digitalInputState_New;
 
@@ -184,21 +182,17 @@ void loop() {
   bool bLogged = false;
   delay(1000);
   DateTime now = rtc.now();
-   
-  lcd.setCursor(13,1);
-  if ((tickCounterSec & B00000001) == B00000001)
-     lcd.print(":");
-  else
-     lcd.print(" ");
-     
-  if (flashing)
+
+/*
+  if (bSDLogging)
   {
+    lcd.setCursor(13,1);
     if ((tickCounterSec & B00000001) == B00000001)
-       digitalOutputState = digitalOutputState | DOUT4;
+       lcd.print(":");
     else
-       digitalOutputState = digitalOutputState & (~DOUT4);
-    SetDigitalOutputState();
+       lcd.print(" ");
   }
+*/
   if ((tickCounterSec % DELAY_DIN_CHECKING_SEC) == 0)
   {
   // Sample digital inputs and set digital outputs
@@ -214,7 +208,6 @@ void loop() {
         case (B00000000):   // Water level between the high and low levels, this is the normal case
                             // Note: Bypass Valve may be open if low level switch hit last,
                             //       or closed if high level switch hit last
-          flashing = false;
           digitalOutputState = digitalOutputState | DOUT1;    // send one to DO1 to open inlet valve
           digitalOutputState = digitalOutputState | DOUT4;    // send one to DO5 to turn off flashing
           digitalOutputState = digitalOutputState | DOUT5;    // send one to DO5 to turn on green LED
@@ -224,7 +217,6 @@ void loop() {
           break;
           
         case (B00000001):   // Pump shut off check float switches
-          flashing = true;
           digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO1 to open bypass valve
           digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve
           digitalOutputState = digitalOutputState & (~DOUT2); // send zero to DO2 to turn off the pump
@@ -235,7 +227,6 @@ void loop() {
           break;
           
         case (B00000010):   // Tank level low opening bypass
-          //flashing = false;
           digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO1 to open bypass valve
           digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve
           //digitalOutputState = digitalOutputState | DOUT4;    // send one to DO4 to turn off flashing
@@ -244,7 +235,6 @@ void loop() {
           break;
           
         case (B00000011):   // Tank very low shutting off pump
-          flashing = true;
           digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO1 to open bypass valve
           digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve      
           digitalOutputState = digitalOutputState & (~DOUT2); // send zero to DO2 to turn off the pump
@@ -255,7 +245,6 @@ void loop() {
           break;
           
         case (B00000100):   // Tank level high closing bypass
-          //flashing = false;
           digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
           digitalOutputState = digitalOutputState | DOUT2; // send one to DO2 to turn on the pump
           digitalOutputState = digitalOutputState | DOUT3; // send one to DO3 to turn on the UV
@@ -266,7 +255,6 @@ void loop() {
           break;
           
         case (B00001000):   // Tank very high shutting off pump
-          flashing = true;
           digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
           digitalOutputState = digitalOutputState & (~DOUT1); // send zero to DO0 to close input valve
           digitalOutputState = digitalOutputState | DOUT2; // send one to DO2 to turn on the pump
@@ -278,7 +266,6 @@ void loop() {
           break;
           
         case (B00001100):   // Tank very high shutting off pump
-          flashing = true;
           digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
           digitalOutputState = digitalOutputState & (~DOUT1); // send zero to DO0 to close input valve
           digitalOutputState = digitalOutputState | DOUT2; // send one to DO2 to turn on the pump
@@ -291,7 +278,6 @@ void loop() {
           break;
           
         default:   // Float switch error shut off pump
-          flashing = true;         
           digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
           LCDOutStatusUpdate();
           SDLogging(true, F("FLT SW ERR"));
@@ -301,13 +287,25 @@ void loop() {
       if (UVtimer > UVtimerMax)
       {
         digitalOutputState = digitalOutputState & (~DOUT3); // send zero to DO3 to turn off UV
-        flashing = true;         
+        digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
       }
       
-      SetDigitalOutputState();
+//      SetDigitalOutputState();
     }
   }
+
+  SetDigitalOutputState();
+  
   tickCounterSec++;
+
+  if (bSDLogging)
+  {
+    lcd.setCursor(13,1);
+    if ((tickCounterSec & B00000001) == B00000001)
+       lcd.print(":");
+    else
+       lcd.print(" ");
+  }
 
   if (now.minute() == nextLoggingMin)
   {
@@ -396,6 +394,11 @@ void SDLogging(bool bShowLCDMessage, const __FlashStringHelper*status)
     lcd.setCursor(10,1);
     lcd.print(" ");
     LCDPrintTwoDigits(now.hour());
+    if (bSDLogging)
+    {
+      lcd.setCursor(13,1);
+      lcd.print(":");
+    }
     lcd.setCursor(14,1);
     LCDPrintTwoDigits(now.minute());
   }    
@@ -490,6 +493,13 @@ void SetDigitalOutputState()
 {
   int iOutput = digitalOutputState;
 #if LED_VERSION
+  if ((iOutput & DOUT4) != DOUT4)
+  {
+    if ((tickCounterSec & B00000001) == B00000001)
+       iOutput = iOutput | DOUT4;
+    else
+       iOutput = iOutput & (~DOUT4);
+  }
   iOutput = iOutput ^ DOUT4;
 #endif
   digitalWrite(latchPin74HC595, LOW);          //Pull latch LOW to start sending data
