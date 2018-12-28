@@ -52,23 +52,23 @@ File fileSDCard;
 #define dataPin74HC595  1  //Pin connected to data in (DS) of 74HC595
 
 /*
-Din3  Din2  Din1  Din0    Dout4 Dout3 Dout2 Dout1 Dout0     
-0     0     0     0       0     0     0     0     0       Water level between the high and low levels, this is the normal case  
-0     0     0     1       1     0     0     0     0       error condition   shut off the pump   flash the light 
-0     0     1     0       0     0     0     0     1       water level low  open the bypass valve to raise the water level 
-0     0     1     1       1     0     0     0     0       water level very low   shut off the pump   flash the light  
-0     1     0     0       0     0     0     0     0       water level high    close the bypass valve to lower the water level 
-0     1     0     1       1     0     0     0     0       error condition   shut off the pump   flash the light 
-0     1     1     0       1     0     0     0     0       error condition   flash the light 
-0     1     1     1       1     0     0     0     0       error condition shut off the pump  flash the light  
-1     0     0     0       1     0     0     0     0       error conditon  turn off the incoming water  flash the light  
-1     0     0     1       1     0     0     0     0       error condition   shut off the pump   flash the light 
-1     0     1     0       1     0     0     0     0       error condition  flash the light 
-1     0     1     1       1     0     0     0     0       error condition   shut off the pump   flash the light 
-1     1     0     0       1     0     0     0     0       water level very high shut off the incoming water  flash the light  probable cause clogged filters
-1     1     0     1       1     0     0     0     0       error condition shut off the pump  flash the light  
-1     1     1     0       1     0     0     0     0       error condition flash the light 
-1     1     1     1       1     0     0     0     0       error condition shut off the pump  flash the light  
+Din3  Din2  Din1  Din0    Dout5 Dout4 Dout3 Dout2 Dout1 Dout0     
+0     0     0     0       1     1     x     x     1     x       Water level between the high and low levels, this is the normal case  
+0     0     0     1       0     0     x     0     1     x       error condition   shut off the pump   flash the light 
+0     0     1     0       0     x     x     x     1     1       water level low  open the bypass valve to raise the water level 
+0     0     1     1       0     0     x     0     1     1       water level very low   shut off the pump   flash the light  
+0     1     0     0       0     x     1     1     x     0       water level high    close the bypass valve to lower the water level 
+0     1     0     1       0     0     x     x     x     x       error condition   shut off the pump   flash the light 
+0     1     1     0       0     0     x     x     x     x       error condition   flash the light 
+0     1     1     1       0     0     x     x     x     x       error condition shut off the pump  flash the light  
+1     0     0     0       0     0     1     1     0     0       error conditon  turn off the incoming water  flash the light  
+1     0     0     1       0     0     x     x     x     x       error condition   shut off the pump   flash the light 
+1     0     1     0       0     0     x     x     x     x       error condition  flash the light 
+1     0     1     1       0     0     x     x     x     x       error condition   shut off the pump   flash the light 
+1     1     0     0       0     0     1     1     0     0       water level very high shut off the incoming water  flash the light  prob clogged filters
+1     1     0     1       0     0     x     x     x     x       error condition shut off the pump  flash the light  
+1     1     1     0       0     0     x     x     x     x       error condition flash the light 
+1     1     1     1       0     0     x     x     x     x       error condition shut off the pump  flash the light  
  */
 
 // Digital In
@@ -225,9 +225,9 @@ void loop() {
           
         case (B00000001):   // Pump shut off check float switches
           flashing = true;
-          digitalOutputState = digitalOutputState & (~DOUT2); // send zero to DO2 to turn off the pump
           digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO1 to open bypass valve
           digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve
+          digitalOutputState = digitalOutputState & (~DOUT2); // send zero to DO2 to turn off the pump
           digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
           LCDOutStatusUpdate();
           SDLogging(true, F("FLT SW ERR"));
@@ -235,19 +235,19 @@ void loop() {
           break;
           
         case (B00000010):   // Tank level low opening bypass
-          flashing = false;
+          //flashing = false;
           digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO1 to open bypass valve
           digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve
-          digitalOutputState = digitalOutputState | DOUT4;    // send one to DO5 to turn off flashing
+          //digitalOutputState = digitalOutputState | DOUT4;    // send one to DO4 to turn off flashing
           LCDOutStatusUpdate();
-          SDLogging(true, F("lo  Opn Bp"));
+          SDLogging(true, F("Lo  Opn Bp"));
           break;
           
         case (B00000011):   // Tank very low shutting off pump
           flashing = true;
-          digitalOutputState = digitalOutputState & (~DOUT2); // send zero to DO2 to turn off the pump
           digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO1 to open bypass valve
           digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve      
+          digitalOutputState = digitalOutputState & (~DOUT2); // send zero to DO2 to turn off the pump
           digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
           LCDOutStatusUpdate();
           SDLogging(true, F("LO! Pm Off"));
@@ -255,22 +255,22 @@ void loop() {
           break;
           
         case (B00000100):   // Tank level high closing bypass
-          flashing = false;
+          //flashing = false;
+          digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
           digitalOutputState = digitalOutputState | DOUT2; // send one to DO2 to turn on the pump
           digitalOutputState = digitalOutputState | DOUT3; // send one to DO3 to turn on the UV
-          digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
-          digitalOutputState = digitalOutputState | DOUT4;    // send one to DO5 to turn off flashing
+          //digitalOutputState = digitalOutputState | DOUT4;    // send one to DO4 to turn off flashing
           LCDOutStatusUpdate();
-          SDLogging(true, F("hi  Cls Bp"));
+          SDLogging(true, F("Hi  Cls Bp"));
           UVtimer = 0;
           break;
           
         case (B00001000):   // Tank very high shutting off pump
           flashing = true;
-          digitalOutputState = digitalOutputState | DOUT2; // send one to DO2 to turn on the pump
-          digitalOutputState = digitalOutputState | DOUT3; // send one to DO3 to turn on the UV
           digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
           digitalOutputState = digitalOutputState & (~DOUT1); // send zero to DO0 to close input valve
+          digitalOutputState = digitalOutputState | DOUT2; // send one to DO2 to turn on the pump
+          digitalOutputState = digitalOutputState | DOUT3; // send one to DO3 to turn on the UV
           digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
           LCDOutStatusUpdate();
           SDLogging(true, F("FLT SW ERR"));
@@ -279,14 +279,14 @@ void loop() {
           
         case (B00001100):   // Tank very high shutting off pump
           flashing = true;
-          digitalOutputState = digitalOutputState | DOUT2; // send one to DO2 to turn on the pump
-          digitalOutputState = digitalOutputState | DOUT3; // send one to DO3 to turn on the UV
           digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
           digitalOutputState = digitalOutputState & (~DOUT1); // send zero to DO0 to close input valve
+          digitalOutputState = digitalOutputState | DOUT2; // send one to DO2 to turn on the pump
+          digitalOutputState = digitalOutputState | DOUT3; // send one to DO3 to turn on the UV
           digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
           LCDOutStatusUpdate();
           //SDLogging(true, F("TNK LVL VRY HIGH"));
-          SDLogging(true, F("HI! Ck Flt"));
+          SDLogging(true, F("HI! CkFilt"));
           UVtimer = 0;
           break;
           
