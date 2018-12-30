@@ -15,8 +15,7 @@
 
 #define DELAY_DIN_CHECKING_SEC  5
 #define DELAY_LOGGING_MIN 1
-//#define DELAY_UVTIMER_SEC 900
-#define DELAY_UVTIMER_SEC 90
+#define DELAY_UVTIMER_SEC 900
 
 long tickCounterSec = 0;
 int  nextLoggingMin = 0;
