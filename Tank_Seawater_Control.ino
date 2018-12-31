@@ -178,10 +178,13 @@ void setup() {
 }
 
 
-void loop() {
+void loop() 
+{
   bool bLogged = false;
   const __FlashStringHelper *cStatus;
+
   delay(1000);
+  
   DateTime now = rtc.now();
 
   if ((tickCounterSec % DELAY_DIN_CHECKING_SEC) == 0)
@@ -357,14 +360,6 @@ void SetupSDCardOperations()
     }
   }
   SD.end();
-  if (!SD.begin(chipSelectSDCard)) 
-  {
-    lcd.setCursor(0, 0);
-    lcd.print(F("*** ERROR ***   "));
-    lcd.setCursor(0, 1);
-    lcd.print(F("SD Init Failed  "));
-    while (1);
-  }
 
   lcd.setCursor(0, 0);
   lcd.print(F("*** STATUS ***  "));
@@ -393,7 +388,7 @@ void SDLogging(bool bShowLCDMessage, const __FlashStringHelper*status)
     lcd.setCursor(14,1);
     LCDPrintTwoDigits(now.minute());
   }    
-  SD.end();
+
   if (!SD.begin(chipSelectSDCard)) 
   {
     lcd.setCursor(0, 0);
@@ -429,10 +424,10 @@ void SDLogging(bool bShowLCDMessage, const __FlashStringHelper*status)
     fileSDCard.print(",");
     fileSDCard.print(status);
     fileSDCard.println("");
-    // close the file:
     fileSDCard.close();
-    //Serial.println("done.");
-  } else 
+    SD.end();
+  } 
+  else 
   {
     // if the file didn't open, print an error:
     lcd.setCursor(0, 0);
