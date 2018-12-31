@@ -1,15 +1,16 @@
 /*
   Tank Seawater Control
+  Hopkins Marine Station
 
-  xxxxx
-  
-  The circuit:
+  Original: Visual Basic
+            John Lee
 
-  created 2018
-  by Tom Rolander
+  Modified: Arduino
+            Tom Rolander
 */
-#define MODIFIED "2018-12-26"
-#define VERSION "0.3"
+
+#define MODIFIED "2018-12-31"
+#define VERSION "0.4"
 
 #define LED_VERSION true
 
@@ -23,7 +24,6 @@ int  nextLoggingMin = 0;
 int UVtimer = 0;
 int UVtimerMax = DELAY_UVTIMER_SEC / DELAY_DIN_CHECKING_SEC;
 
-
 bool bSDLogging = true;
 
 // Date and time functions using a DS1307 RTC connected via I2C and Wire lib
@@ -32,6 +32,7 @@ bool bSDLogging = true;
 
 RTC_PCF8523 rtc;
 
+// SD Card used for data logging
 #include <SD.h>
 
 File fileSDCard;
@@ -45,13 +46,14 @@ File fileSDCard;
 // MKRZero SD: SDCARD_SS_PIN
 #define chipSelectSDCard 10
 
+
 // 74HC595 8-bit, serial-in, parallel-out shift register
 //
 #define latchPin74HC595 3  //Pin connected to latch pin (ST_CP) of 74HC595
 #define clockPin74HC595 2  //Pin connected to clock pin (SH_CP) of 74HC595
 #define dataPin74HC595  1  //Pin connected to data in (DS) of 74HC595
 
-/*
+/*  Data In and corresponding Data Out states for Tank Seawater Control
 Din3  Din2  Din1  Din0    Dout5 Dout4 Dout3 Dout2 Dout1 Dout0     
 0     0     0     0       1     1     x     x     1     x       Water level between the high and low levels, this is the normal case  
 0     0     0     1       0     0     x     0     1     x       error condition   shut off the pump   flash the light 
@@ -77,7 +79,6 @@ Din3  Din2  Din1  Din0    Dout5 Dout4 Dout3 Dout2 Dout1 Dout0
 #define Din2 A2
 #define Din3 A3
 
-
 // Digital Out
 #define DOUT0 B00000001   // Bypass Valve
 #define DOUT1 B00000010   // Shutoff / Inlet Valve
@@ -88,8 +89,8 @@ Din3  Din2  Din1  Din0    Dout5 Dout4 Dout3 Dout2 Dout1 Dout0
 
 int digitalOutputState = DOUT0 | DOUT1 | DOUT2 | DOUT3 | DOUT4 | DOUT5;  // Value to show in the 6 LEDs and relay drivers
 
-
-
+// NOTE: Using Version 1.0.6
+//       Compile/Link FAILS with Version 1.0.7
 #include <LiquidCrystal.h>
 
 // initialize the library by associating any needed LCD interface pin
@@ -101,10 +102,9 @@ LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 int digitalInputState_Saved = B11111111;
 int digitalInputState_New;
 
-// Constant Strings:
 
-
-void setup() {
+void setup() 
+{
 
   // Immediately set the state of the DOUT's
   Setup_74HC595();
@@ -124,15 +124,18 @@ void setup() {
 // NOTE: Do NOT use Serial because Auduino UNO pin 1 is used by 74HC595 shift register
 //Serial.begin(9600);
 
-  if (! rtc.begin()) {
+  if (! rtc.begin()) 
+  {
+    lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print(F("*** ERROR ***   "));
     lcd.setCursor(0, 1);
     lcd.print(F("Couldnt find RTC"));
     while (1);
   } 
-  if (! rtc.initialized()) {
-    
+  if (! rtc.initialized()) 
+  {
+    lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print(F("*** WARN ***    "));
     lcd.setCursor(0, 1);
@@ -146,6 +149,7 @@ void setup() {
   }
   DateTime now = rtc.now();
 
+  lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print(F("*** DATE ***    "));
   lcd.setCursor(0, 1);
@@ -169,10 +173,11 @@ void setup() {
   pinMode(Din3, INPUT_PULLUP);
 
   // Initial state display in LCD
+  lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print(F("UV=1 O=1 I=1 B=1"));
   lcd.setCursor(0, 1);
-  lcd.print(F("Tank Level Norml"));
+  lcd.print(F("Tnk Normal"));
   //SetupSDCardSwitch();
   SetupSDCardOperations();
 }
@@ -189,91 +194,90 @@ void loop()
 
   if ((tickCounterSec % DELAY_DIN_CHECKING_SEC) == 0)
   {
-  // Sample digital inputs and set digital outputs
+    // Sample digital inputs and set digital outputs approximately every 5 seconds
+    
     digitalInputState_New = SampleDigitalInputs();
-    //if ((digitalInputState_New != digitalInputState_Saved) || (bSDLogging == false))
+  
+    bLogged = true;
+    digitalOutputState = digitalOutputState & (~DOUT5);     // send zero to DO5 to turn off green LED
+    
+    switch (digitalInputState_New)
     {
-      bLogged = true;
-      bSDLogging = true;
-      digitalOutputState = digitalOutputState & (~DOUT5);     // send zero to DO5 to turn off green LED
-      switch (digitalInputState_New)
-      {
-        case (B00000000):   // Water level between the high and low levels, this is the normal case
-                            // Note: Bypass Valve may be open if low level switch hit last,
-                            //       or closed if high level switch hit last
-          digitalOutputState = digitalOutputState | DOUT1;    // send one to DO1 to open inlet valve
-          digitalOutputState = digitalOutputState | DOUT4;    // send one to DO5 to turn off flashing
-          digitalOutputState = digitalOutputState | DOUT5;    // send one to DO5 to turn on green LED
-
-          cStatus = F("Tnk Normal");
-          break;
-          
-        case (B00000001):   // Pump shut off check float switches
-          digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO1 to open bypass valve
-          digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve
-          digitalOutputState = digitalOutputState & (~DOUT2); // send zero to DO2 to turn off the pump
-          digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
-          cStatus = F("FLT SW ERR");
-          UVtimer = UVtimer + 1;
-          break;
-          
-        case (B00000010):   // Tank level low opening bypass
-          digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO1 to open bypass valve
-          digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve
-          //digitalOutputState = digitalOutputState | DOUT4;  // send one to DO4 to turn off flashing
-          cStatus = F("Lo  Opn Bp");
-          break;
-          
-        case (B00000011):   // Tank very low shutting off pump
-          digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO1 to open bypass valve
-          digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve      
-          digitalOutputState = digitalOutputState & (~DOUT2); // send zero to DO2 to turn off the pump
-          digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
-          cStatus = F("LO! Pm Off");
-          UVtimer = UVtimer + 1;
-          break;
-          
-        case (B00000100):   // Tank level high closing bypass
-          digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
-          digitalOutputState = digitalOutputState | DOUT2;    // send one to DO2 to turn on the pump
-          digitalOutputState = digitalOutputState | DOUT3;    // send one to DO3 to turn on the UV
-          //digitalOutputState = digitalOutputState | DOUT4;  // send one to DO4 to turn off flashing
-          cStatus = F("Hi  Cls Bp");
-          UVtimer = 0;
-          break;
-          
-        case (B00001000):   // Tank very high shutting off pump
-          digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
-          digitalOutputState = digitalOutputState & (~DOUT1); // send zero to DO0 to close input valve
-          digitalOutputState = digitalOutputState | DOUT2;    // send one to DO2 to turn on the pump
-          digitalOutputState = digitalOutputState | DOUT3;    // send one to DO3 to turn on the UV
-          digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
-          cStatus = F("FLT SW ERR");
-          UVtimer = 0;
-          break;
-          
-        case (B00001100):   // Tank very high shutting off pump
-          digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
-          digitalOutputState = digitalOutputState & (~DOUT1); // send zero to DO0 to close input valve
-          digitalOutputState = digitalOutputState | DOUT2;    // send one to DO2 to turn on the pump
-          digitalOutputState = digitalOutputState | DOUT3;    // send one to DO3 to turn on the UV
-          digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
-          cStatus = F("HI! CkFilt");
-          UVtimer = 0;
-          break;
-          
-        default:   // Float switch error shut off pump
-          digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
-          cStatus = F("FLT SW ERR");
-          break;
-      }
+      case (B00000000):   // Water level between the high and low levels, this is the normal case
+                          // Note: Bypass Valve may be open if low level switch hit last,
+                          //       or closed if high level switch hit last
+        digitalOutputState = digitalOutputState | DOUT1;    // send one to DO1 to open inlet valve
+        digitalOutputState = digitalOutputState | DOUT4;    // send one to DO5 to turn off flashing
+        digitalOutputState = digitalOutputState | DOUT5;    // send one to DO5 to turn on green LED
+        cStatus = F("Tnk Normal");
+        break;
+        
+      case (B00000001):   // Pump shut off check float switches
+        digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO1 to open bypass valve
+        digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve
+        digitalOutputState = digitalOutputState & (~DOUT2); // send zero to DO2 to turn off the pump
+        digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
+        cStatus = F("FLT SW ERR");
+        UVtimer = UVtimer + 1;
+        break;
+        
+      case (B00000010):   // Tank level low opening bypass
+        digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO1 to open bypass valve
+        digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve
+        //digitalOutputState = digitalOutputState | DOUT4;  // send one to DO4 to turn off flashing
+        cStatus = F("Lo  Opn Bp");
+        break;
+        
+      case (B00000011):   // Tank very low shutting off pump
+        digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO1 to open bypass valve
+        digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve      
+        digitalOutputState = digitalOutputState & (~DOUT2); // send zero to DO2 to turn off the pump
+        digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
+        cStatus = F("LO! Pm Off");
+        UVtimer = UVtimer + 1;
+        break;
+        
+      case (B00000100):   // Tank level high closing bypass
+        digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
+        digitalOutputState = digitalOutputState | DOUT2;    // send one to DO2 to turn on the pump
+        digitalOutputState = digitalOutputState | DOUT3;    // send one to DO3 to turn on the UV
+        //digitalOutputState = digitalOutputState | DOUT4;  // send one to DO4 to turn off flashing
+        cStatus = F("Hi  Cls Bp");
+        UVtimer = 0;
+        break;
+        
+      case (B00001000):   // Tank very high shutting off pump
+        digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
+        digitalOutputState = digitalOutputState & (~DOUT1); // send zero to DO0 to close input valve
+        digitalOutputState = digitalOutputState | DOUT2;    // send one to DO2 to turn on the pump
+        digitalOutputState = digitalOutputState | DOUT3;    // send one to DO3 to turn on the UV
+        digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
+        cStatus = F("FLT SW ERR");
+        UVtimer = 0;
+        break;
+        
+      case (B00001100):   // Tank very high shutting off pump
+        digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
+        digitalOutputState = digitalOutputState & (~DOUT1); // send zero to DO0 to close input valve
+        digitalOutputState = digitalOutputState | DOUT2;    // send one to DO2 to turn on the pump
+        digitalOutputState = digitalOutputState | DOUT3;    // send one to DO3 to turn on the UV
+        digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
+        cStatus = F("HI! CkFilt");
+        UVtimer = 0;
+        break;
+        
+      default:   // Float switch error shut off pump
+        digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
+        cStatus = F("FLT SW ERR");
+        break;
     }
 
-    LCDOutStatusUpdate();
-    if ((digitalInputState_New != digitalInputState_Saved) || (bSDLogging == false))
+    LCDDigitalOutputUpdate();
+    
+    if ((digitalInputState_New != digitalInputState_Saved) || bSDLogging == false)
     {
       digitalInputState_Saved = digitalInputState_New;
-      SDLogging(true, cStatus);
+      LCDStatusUpdate_SDLogging(cStatus);
     }
     
     if (UVtimer > UVtimerMax)
@@ -282,8 +286,8 @@ void loop()
       {
         digitalOutputState = digitalOutputState & (~DOUT3);   // send zero to DO3 to turn off UV
         digitalOutputState = digitalOutputState & (~DOUT4);   // send zero to DO4 to turn on flashing
-        LCDOutStatusUpdate();
-        SDLogging(true, F("UV is OFF "));
+        LCDDigitalOutputUpdate();
+        LCDStatusUpdate_SDLogging(F("UV is OFF "));
       }
     }    
   }
@@ -292,20 +296,17 @@ void loop()
   
   tickCounterSec++;
 
-  if (bSDLogging)
-  {
-    lcd.setCursor(13,1);
-    if ((tickCounterSec & B00000001) == B00000001)
-       lcd.print(":");
-    else
-       lcd.print(" ");
-  }
+  lcd.setCursor(13,1);
+  if ((tickCounterSec & B00000001) == B00000001)
+     lcd.print(":");
+  else
+     lcd.print(" ");
 
   if (now.minute() == nextLoggingMin)
   {
     nextLoggingMin = (now.minute() + DELAY_LOGGING_MIN) % 60;
     if (bLogged == false)
-      SDLogging(true, F(""));
+      LCDStatusUpdate_SDLogging(F(""));
   }
 }
 
@@ -325,12 +326,14 @@ int SampleDigitalInputs()
 
 void SetupSDCardOperations()
 {   
+  lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print(F("*** STATUS ***  "));
   lcd.setCursor(0, 1);
   lcd.print(F("SD Init Start   "));
 
   if (!SD.begin(chipSelectSDCard)) {
+    lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print(F("*** ERROR ***   "));
     lcd.setCursor(0, 1);
@@ -345,6 +348,7 @@ void SetupSDCardOperations()
   } 
   else
   {
+    // File doesn't exist, create it with first line of column headings
     fileSDCard = SD.open("LOGGING.CSV", FILE_WRITE);
     if (fileSDCard) 
     {
@@ -353,51 +357,48 @@ void SetupSDCardOperations()
     }
     else
     {
+      lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print(F("*** ERROR ***   "));
       lcd.setCursor(0, 1);
       lcd.print(F("SD Write Failed "));
+      while (1);
     }
   }
   SD.end();
 
+  lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print(F("*** STATUS ***  "));
   lcd.setCursor(0, 1);
   lcd.print(F("SD Init Finish  "));
-  SDLogging(false, F("Start Up  "));
+  delay(2000);
+  lcd.clear();
+  LCDDigitalOutputUpdate();
+  LCDStatusUpdate_SDLogging(F("Start Up  "));
 }
 
-void SDLogging(bool bShowLCDMessage, const __FlashStringHelper*status)
+void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
 {
   DateTime now = rtc.now();
       
-  if (bShowLCDMessage)
-  {
-    lcd.setCursor(0, 1);
-    lcd.print(status);
+  lcd.setCursor(0, 1);
+  lcd.print(status);
 
-    lcd.setCursor(10,1);
-    lcd.print(" ");
-    LCDPrintTwoDigits(now.hour());
-    if (bSDLogging)
-    {
-      lcd.setCursor(13,1);
-      lcd.print(":");
-    }
-    lcd.setCursor(14,1);
-    LCDPrintTwoDigits(now.minute());
-  }    
+  lcd.setCursor(10,1);
+  lcd.print(" ");
+  LCDPrintTwoDigits(now.hour());
+  lcd.setCursor(14,1);
+  LCDPrintTwoDigits(now.minute());   
 
   if (!SD.begin(chipSelectSDCard)) 
   {
-    lcd.setCursor(0, 0);
-    lcd.print(F("*** SD ERROR ***"));
     lcd.setCursor(0, 1);
-    lcd.print(F("SD Logging Fail "));
+    lcd.print(F("SD LogFail"));
     bSDLogging = false;
     return;
   }
+  bSDLogging = true;
   
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
@@ -449,9 +450,8 @@ void Setup_74HC595()
   SetDigitalOutputState();
 }
 
-void LCDOutStatusUpdate()
+void LCDDigitalOutputUpdate()
 {
-//  lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print(F("UV="));
   if ((digitalOutputState & DOUT3) == 0)
