@@ -93,7 +93,7 @@ int digitalOutputState = DOUT0 | DOUT1 | DOUT2 | DOUT3 | DOUT4 | DOUT5;  // Valu
 //       Compile/Link FAILS with Version 1.0.7
 #include <LiquidCrystal.h>
 
-// initialize the library by associating any needed LCD interface pin
+// Initialize the LCD library by associating LCD interface pins
 // with the arduino pin number it is connected to
 const int rs = 4, en = 5, d4 = 9, d5 = 8, d6 = 7, d7 = 6;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
@@ -105,13 +105,11 @@ int digitalInputState_New;
 
 void setup() 
 {
-
   // Immediately set the state of the DOUT's
   Setup_74HC595();
   
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
-  // Print a message to the LCD.
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print(F("Tnk Swtr Ctl "));
@@ -124,6 +122,7 @@ void setup()
 // NOTE: Do NOT use Serial because Auduino UNO pin 1 is used by 74HC595 shift register
 //Serial.begin(9600);
 
+// Initialize the Real Time Clock
   if (! rtc.begin()) 
   {
     lcd.clear();
@@ -166,7 +165,7 @@ void setup()
 
   nextLoggingMin = (now.minute() + DELAY_LOGGING_MIN) % 60;
   
-  // initialize the DIP Switch 4 position pins as an input:
+  // initialize the DIP Switch 4 position pins as an input using the internal pullups:
   pinMode(Din0, INPUT_PULLUP);
   pinMode(Din1, INPUT_PULLUP);
   pinMode(Din2, INPUT_PULLUP);
@@ -188,6 +187,7 @@ void loop()
   bool bLogged = false;
   const __FlashStringHelper *cStatus;
 
+// NOTE: Consider running the loop() on a 1 second timer interrupt instead of a delay of 1 second
   delay(1000);
   
   DateTime now = rtc.now();
@@ -279,7 +279,8 @@ void loop()
       digitalInputState_Saved = digitalInputState_New;
       LCDStatusUpdate_SDLogging(cStatus);
     }
-    
+
+    // Turn off UV sterilizers when discharge pump is off for more than 15 minutes
     if (UVtimer > UVtimerMax)
     {
       if ((digitalOutputState & DOUT3) == DOUT3)
@@ -296,6 +297,7 @@ void loop()
   
   tickCounterSec++;
 
+// Flash the colon in the time display every second
   lcd.setCursor(13,1);
   if ((tickCounterSec & B00000001) == B00000001)
      lcd.print(":");
@@ -310,6 +312,8 @@ void loop()
   }
 }
 
+// Read all 4 float switches
+// Note: with pullups the state is active low
 int SampleDigitalInputs() 
 {
   int digitalInputState_Current = B00000000;
@@ -324,6 +328,8 @@ int SampleDigitalInputs()
     return (digitalInputState_Current);
 }
 
+// Initialize the SD for operations
+// If the LOGGING.CSV file is not present create the file with the first line of column headings
 void SetupSDCardOperations()
 {   
   lcd.clear();
@@ -348,7 +354,6 @@ void SetupSDCardOperations()
   } 
   else
   {
-    // File doesn't exist, create it with first line of column headings
     fileSDCard = SD.open("LOGGING.CSV", FILE_WRITE);
     if (fileSDCard) 
     {
@@ -400,8 +405,6 @@ void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
   }
   bSDLogging = true;
   
-  // open the file. note that only one file can be open at a time,
-  // so you have to close this one before opening another.
   fileSDCard = SD.open("LOGGING.CSV", FILE_WRITE);
 
   // if the file opened okay, write to it:
@@ -430,7 +433,7 @@ void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
   } 
   else 
   {
-    // if the file didn't open, print an error:
+    // if the file didn't open, display an error:
     lcd.setCursor(0, 0);
     lcd.print(F("*** ERROR ***   "));
     lcd.setCursor(0, 1);
@@ -438,11 +441,9 @@ void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
   }  
 }
 
+//setup 8-bit, serial-in, parallel-out shift register
 void Setup_74HC595()
-{ 
-  //setup 8-bit, serial-in, parallel-out shift register
-  
-  //set pins to output because they are addressed in the main loop
+{   
   pinMode(latchPin74HC595, OUTPUT);
   pinMode(dataPin74HC595, OUTPUT);  
   pinMode(clockPin74HC595, OUTPUT);
