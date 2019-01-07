@@ -54,24 +54,24 @@ File fileSDCard;
 #define dataPin74HC595  1  //Pin connected to data in (DS) of 74HC595
 
 /*  Data In and corresponding Data Out states for Tank Seawater Control
-Din3  Din2  Din1  Din0    Dout5 Dout4 Dout3 Dout2 Dout1 Dout0     
-0     0     0     0       1     1     x     x     1     x       Water level between the high and low levels, this is the normal case  
-0     0     0     1       0     0     x     0     1     x       error condition   shut off the pump   flash the light 
-0     0     1     0       0     x     x     x     1     1       water level low  open the bypass valve to raise the water level 
-0     0     1     1       0     0     x     0     1     1       water level very low   shut off the pump   flash the light  
-0     1     0     0       0     x     1     1     x     0       water level high    close the bypass valve to lower the water level 
-0     1     0     1       0     0     x     x     x     x       error condition   shut off the pump   flash the light 
-0     1     1     0       0     0     x     x     x     x       error condition   flash the light 
-0     1     1     1       0     0     x     x     x     x       error condition shut off the pump  flash the light  
-1     0     0     0       0     0     1     1     0     0       error conditon  turn off the incoming water  flash the light  
-1     0     0     1       0     0     x     x     x     x       error condition   shut off the pump   flash the light 
-1     0     1     0       0     0     x     x     x     x       error condition  flash the light 
-1     0     1     1       0     0     x     x     x     x       error condition   shut off the pump   flash the light 
-1     1     0     0       0     0     1     1     0     0       water level very high shut off the incoming water  flash the light  prob clogged filters
-1     1     0     1       0     0     x     x     x     x       error condition shut off the pump  flash the light  
-1     1     1     0       0     0     x     x     x     x       error condition flash the light 
-1     1     1     1       0     0     x     x     x     x       error condition shut off the pump  flash the light  
- */
+Din3 Din2 Din1 Din0  Dout5 Dout4 Dout3 Dout2 Dout1 Dout0     
+0    0    0    0     1     1     x     x     1     x     Wtr lvl between the high and low levels, this is the normal case  
+0    0    0    1     0     0     x     0     1     x     Error: shut off the pump, flash the light 
+0    0    1    0     0     x     x     x     1     1     Wtr lvl low  open the bypass valve to raise the Wtr lvl 
+0    0    1    1     0     0     x     0     1     1     Wtr lvl very low, shut off the pump, flash the light  
+0    1    0    0     0     x     1     1     x     0     Wtr lvl high,  close the bypass valve to lower the Wtr lvl 
+0    1    0    1     0     0     x     x     x     x     Error: shut off the pump, flash the light 
+0    1    1    0     0     0     x     x     x     x     Error: flash the light 
+0    1    1    1     0     0     x     x     x     x     Error: shut off the pump  flash the light  
+1    0    0    0     0     0     1     1     0     0     Error: turn off the incoming water, flash the light  
+1    0    0    1     0     0     x     x     x     x     Error: shut off the pump, flash the light 
+1    0    1    0     0     0     x     x     x     x     Error: flash the light 
+1    0    1    1     0     0     x     x     x     x     Error: shut off the pump, flash the light 
+1    1    0    0     0     0     1     1     0     0     Wtr lvl very high, incoming water off, flash the light, clogged filters?
+1    1    0    1     0     0     x     x     x     x     Error: shut off the pump, flash the light  
+1    1    1    0     0     0     x     x     x     x     Error: flash the light 
+1    1    1    1     0     0     x     x     x     x     Error: shut off the pump, flash the light  
+*/
 
 // Digital In
 #define Din0 A0
