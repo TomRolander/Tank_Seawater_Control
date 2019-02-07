@@ -9,10 +9,10 @@
             Tom Rolander
 */
 
-#define MODIFIED "2018-12-31"
-#define VERSION "0.4"
+#define MODIFIED "2019-02-07"
+#define VERSION "0.5"
 
-#define LED_VERSION true
+#define LED_VERSION false
 
 #define DELAY_DIN_CHECKING_SEC  5
 #define DELAY_LOGGING_MIN 1
@@ -71,6 +71,20 @@ Din3 Din2 Din1 Din0  Dout5 Dout4 Dout3 Dout2 Dout1 Dout0
 1    1    0    1     0     0     x     x     x     x     Error: shut off the pump, flash the light  
 1    1    1    0     0     0     x     x     x     x     Error: flash the light 
 1    1    1    1     0     0     x     x     x     x     Error: shut off the pump, flash the light  
+*/
+
+/*
+Dout  Description    Value
+ 0    Bypass Valve   0 = Close
+                     1 = Open
+ 1    Inlet Valve    0 = Close
+                     1 = Open
+ 2    Pump           0 = Off
+                     1 = On
+ 3    UV Sterilizer  0 = Off
+                     1 = On
+ 4    Warn Light     0 = On, flashing
+                     1 = Off
 */
 
 // Digital In
@@ -174,7 +188,7 @@ void setup()
   // Initial state display in LCD
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print(F("UV=1 O=1 I=1 B=1"));
+  lcd.print(F("B=1 I=1 P=1 U=1 "));
   lcd.setCursor(0, 1);
   lcd.print(F("Tnk Normal"));
   //SetupSDCardSwitch();
@@ -454,13 +468,8 @@ void Setup_74HC595()
 void LCDDigitalOutputUpdate()
 {
   lcd.setCursor(0, 0);
-  lcd.print(F("UV="));
-  if ((digitalOutputState & DOUT3) == 0)
-    lcd.write('0');
-  else
-    lcd.write('1');  
-  lcd.print(F(" O="));
-  if ((digitalOutputState & DOUT2) == 0)
+  lcd.print(F("B="));
+  if ((digitalOutputState & DOUT0) == 0)
     lcd.write('0');
   else
     lcd.write('1');
@@ -469,11 +478,20 @@ void LCDDigitalOutputUpdate()
     lcd.write('0');
   else
     lcd.write('1');
-  lcd.print(F(" B="));
-  if ((digitalOutputState & DOUT0) == 0)
+  lcd.print(F(" P="));
+  if ((digitalOutputState & DOUT2) == 0)
     lcd.write('0');
   else
     lcd.write('1');
+  lcd.print(F(" U="));
+  if ((digitalOutputState & DOUT3) == 0)
+    lcd.write('0');
+  else
+    lcd.write('1');  
+  if ((digitalOutputState & DOUT4) != DOUT4)
+    lcd.write('*');
+  else
+    lcd.write(' ');    
 }
 
 void SetDigitalOutputState()
