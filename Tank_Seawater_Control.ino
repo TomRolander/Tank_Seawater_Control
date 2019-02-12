@@ -9,14 +9,17 @@
             Tom Rolander
 */
 
-#define MODIFIED "2019-02-07"
-#define VERSION "0.5"
+#define MODIFIED "2019-02-11"
+#define VERSION "0.6"
 
 #define LED_VERSION false
+#define FORCE_ONE_MINUTE_LOGGING true
 
 #define DELAY_DIN_CHECKING_SEC  5
 #define DELAY_LOGGING_MIN 1
 #define DELAY_UVTIMER_SEC 900
+
+bool bForceOneMinuteLogging = FORCE_ONE_MINUTE_LOGGING;
 
 long tickCounterSec = 0;
 int  nextLoggingMin = 0;
@@ -191,8 +194,9 @@ void setup()
   lcd.print(F("B=1 I=1 P=1 U=1 "));
   lcd.setCursor(0, 1);
   lcd.print(F("Tnk Normal"));
+
   //SetupSDCardSwitch();
-  SetupSDCardOperations();
+  SetupSDCardOperations();  
 }
 
 
@@ -221,13 +225,12 @@ void loop()
                           // Note: Bypass Valve may be open if low level switch hit last,
                           //       or closed if high level switch hit last
         digitalOutputState = digitalOutputState | DOUT1;    // send one to DO1 to open inlet valve
-        digitalOutputState = digitalOutputState | DOUT4;    // send one to DO5 to turn off flashing
+        digitalOutputState = digitalOutputState | DOUT4;    // send one to DO4 to turn off flashing
         digitalOutputState = digitalOutputState | DOUT5;    // send one to DO5 to turn on green LED
         cStatus = F("Tnk Normal");
         break;
         
       case (B00000001):   // Pump shut off check float switches
-        digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO1 to open bypass valve
         digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve
         digitalOutputState = digitalOutputState & (~DOUT2); // send zero to DO2 to turn off the pump
         digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
@@ -236,14 +239,14 @@ void loop()
         break;
         
       case (B00000010):   // Tank level low opening bypass
-        digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO1 to open bypass valve
+        digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO0 to open bypass valve
         digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve
-        //digitalOutputState = digitalOutputState | DOUT4;  // send one to DO4 to turn off flashing
+// UVtimer ??  TBD
         cStatus = F("Lo  Opn Bp");
         break;
         
       case (B00000011):   // Tank very low shutting off pump
-        digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO1 to open bypass valve
+        digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO0 to open bypass valve
         digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve      
         digitalOutputState = digitalOutputState & (~DOUT2); // send zero to DO2 to turn off the pump
         digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
@@ -255,14 +258,13 @@ void loop()
         digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
         digitalOutputState = digitalOutputState | DOUT2;    // send one to DO2 to turn on the pump
         digitalOutputState = digitalOutputState | DOUT3;    // send one to DO3 to turn on the UV
-        //digitalOutputState = digitalOutputState | DOUT4;  // send one to DO4 to turn off flashing
         cStatus = F("Hi  Cls Bp");
         UVtimer = 0;
         break;
         
       case (B00001000):   // Tank very high shutting off pump
         digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
-        digitalOutputState = digitalOutputState & (~DOUT1); // send zero to DO0 to close input valve
+        digitalOutputState = digitalOutputState & (~DOUT1); // send zero to DO1 to close input valve
         digitalOutputState = digitalOutputState | DOUT2;    // send one to DO2 to turn on the pump
         digitalOutputState = digitalOutputState | DOUT3;    // send one to DO3 to turn on the UV
         digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
@@ -272,7 +274,7 @@ void loop()
         
       case (B00001100):   // Tank very high shutting off pump
         digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
-        digitalOutputState = digitalOutputState & (~DOUT1); // send zero to DO0 to close input valve
+        digitalOutputState = digitalOutputState & (~DOUT1); // send zero to DO1 to close input valve
         digitalOutputState = digitalOutputState | DOUT2;    // send one to DO2 to turn on the pump
         digitalOutputState = digitalOutputState | DOUT3;    // send one to DO3 to turn on the UV
         digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
@@ -280,7 +282,7 @@ void loop()
         UVtimer = 0;
         break;
         
-      default:   // Float switch error shut off pump
+      default:   // Float switch error
         digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
         cStatus = F("FLT SW ERR");
         break;
@@ -363,7 +365,35 @@ void SetupSDCardOperations()
 
 // open the file for reading:
   fileSDCard = SD.open("LOGGING.CSV");
-  if (fileSDCard) {
+  if (fileSDCard) 
+  {
+    if (fileSDCard.available())
+    {
+      const __FlashStringHelper *CSVFirstLine = F("\"Date\",\"Time\",\"DOut\",\"Din\",\"Status\",\"Clock\",");      
+      char strClockSetting[128];
+      fileSDCard.read(strClockSetting, sizeof(strClockSetting));
+      strClockSetting[sizeof(strClockSetting)] = '\0';
+      int len = strlen((const char*)CSVFirstLine);
+      int iDateTime[6] = {0,0,0,0,0,0};
+      char *ptr1 = &strClockSetting[len];      
+      for (int i=0; i<6; i++)
+      {
+        char *ptr2 = strchr(ptr1,',');
+        if (ptr2 != 0)
+        {
+          *ptr2 = '\0';
+          iDateTime[i] = atoi(ptr1);
+          ptr1 = &ptr2[1];
+        }
+        else
+        {
+          break;
+        }
+      }
+        
+   // NOTE: this will not set time to something earlier than current RTC
+      rtc.adjust(DateTime(iDateTime[0],iDateTime[1],iDateTime[2],iDateTime[3],iDateTime[4],iDateTime[5]));
+    }
     fileSDCard.close();
   } 
   else
@@ -399,11 +429,10 @@ void SetupSDCardOperations()
 
 void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
 {
-  DateTime now = rtc.now();
-      
   lcd.setCursor(0, 1);
   lcd.print(status);
 
+  DateTime now = rtc.now();      
   lcd.setCursor(10,1);
   lcd.print(" ");
   LCDPrintTwoDigits(now.hour());
@@ -418,41 +447,44 @@ void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
     return;
   }
   bSDLogging = true;
-  
-  fileSDCard = SD.open("LOGGING.CSV", FILE_WRITE);
 
-  // if the file opened okay, write to it:
-  if (fileSDCard) 
+  if ((strcmp((const char*) status, "") != 0) || bForceOneMinuteLogging)
   {
-    fileSDCard.print(now.year(), DEC);
-    fileSDCard.print("/");
-    fileSDCard.print(now.month(), DEC);
-    fileSDCard.print("/");
-    fileSDCard.print(now.day(), DEC);
-    fileSDCard.print(",");
-    fileSDCard.print(now.hour(), DEC);
-    fileSDCard.print(":");
-    fileSDCard.print(now.minute(), DEC);
-    fileSDCard.print(":");
-    fileSDCard.print(now.second(), DEC);
-    fileSDCard.print(",");
-    SDPrintBinary(digitalOutputState ^ DOUT4,6);  // toggle sense of flashing light state
-    fileSDCard.print(",");
-    SDPrintBinary(digitalInputState_Saved,4);
-    fileSDCard.print(",");
-    fileSDCard.print(status);
-    fileSDCard.println("");
-    fileSDCard.close();
-    SD.end();
-  } 
-  else 
-  {
-    // if the file didn't open, display an error:
-    lcd.setCursor(0, 0);
-    lcd.print(F("*** ERROR ***   "));
-    lcd.setCursor(0, 1);
-    lcd.print(F("Open LOGGING.CSV"));
-  }  
+    fileSDCard = SD.open("LOGGING.CSV", FILE_WRITE);
+  
+    // if the file opened okay, write to it:
+    if (fileSDCard) 
+    {
+      fileSDCard.print(now.year(), DEC);
+      fileSDCard.print("/");
+      fileSDCard.print(now.month(), DEC);
+      fileSDCard.print("/");
+      fileSDCard.print(now.day(), DEC);
+      fileSDCard.print(",");
+      fileSDCard.print(now.hour(), DEC);
+      fileSDCard.print(":");
+      fileSDCard.print(now.minute(), DEC);
+      fileSDCard.print(":");
+      fileSDCard.print(now.second(), DEC);
+      fileSDCard.print(",");
+      SDPrintBinary(digitalOutputState ^ DOUT4,6);  // toggle sense of flashing light state
+      fileSDCard.print(",");
+      SDPrintBinary(digitalInputState_Saved,4);
+      fileSDCard.print(",");
+      fileSDCard.print(status);
+      fileSDCard.println("");
+      fileSDCard.close();
+      SD.end();
+    } 
+    else 
+    {
+      // if the file didn't open, display an error:
+      lcd.setCursor(0, 0);
+      lcd.print(F("*** ERROR ***   "));
+      lcd.setCursor(0, 1);
+      lcd.print(F("Open LOGGING.CSV"));
+    }  
+  }
 }
 
 //setup 8-bit, serial-in, parallel-out shift register
@@ -467,6 +499,13 @@ void Setup_74HC595()
 
 void LCDDigitalOutputUpdate()
 {
+  DateTime now = rtc.now();      
+  lcd.setCursor(10,1);
+  lcd.print(" ");
+  LCDPrintTwoDigits(now.hour());
+  lcd.setCursor(14,1);
+  LCDPrintTwoDigits(now.minute());   
+
   lcd.setCursor(0, 0);
   lcd.print(F("B="));
   if ((digitalOutputState & DOUT0) == 0)
