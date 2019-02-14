@@ -363,36 +363,65 @@ void SetupSDCardOperations()
     while (1);
   }
 
+  delay(2000);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(F("* Test clock.csv"));
+  lcd.setCursor(0, 1);
+  if (SD.exists("clock.csv")) 
+  {
+    lcd.print(F("  Set Clock     "));
+    delay(2000);
+
+    fileSDCard = SD.open("clock.csv");
+    if (fileSDCard) 
+    {
+      if (fileSDCard.available())
+      {
+        char strClockSetting[128];
+        fileSDCard.read(strClockSetting, sizeof(strClockSetting));
+        strClockSetting[sizeof(strClockSetting)] = '\0';
+        int iDateTime[6] = {0,0,0,0,0,0};
+        char *ptr1 = &strClockSetting[0];      
+        for (int i=0; i<6; i++)
+        {
+          char *ptr2 = strchr(ptr1,',');
+          if (ptr2 != 0)
+          {
+            *ptr2 = '\0';
+            iDateTime[i] = atoi(ptr1);
+            ptr1 = &ptr2[1];
+          }
+          else
+          {
+            break;
+          }
+        }
+          
+        rtc.adjust(DateTime(iDateTime[0],iDateTime[1],iDateTime[2],iDateTime[3],iDateTime[4],iDateTime[5]));
+        SD.remove("clock.csv");
+
+        lcd.setCursor(0, 1);
+        lcd.print(F("* removed *     "));
+        delay(2000);
+      
+      }
+      fileSDCard.close();
+    } 
+    
+  } else 
+  {
+    lcd.print(F("* does not exist"));
+  }
+  delay(2000);
+
+
 // open the file for reading:
   fileSDCard = SD.open("LOGGING.CSV");
   if (fileSDCard) 
   {
     if (fileSDCard.available())
     {
-      const __FlashStringHelper *CSVFirstLine = F("\"Date\",\"Time\",\"DOut\",\"Din\",\"Status\",\"Clock\",");      
-      char strClockSetting[128];
-      fileSDCard.read(strClockSetting, sizeof(strClockSetting));
-      strClockSetting[sizeof(strClockSetting)] = '\0';
-      int len = strlen((const char*)CSVFirstLine);
-      int iDateTime[6] = {0,0,0,0,0,0};
-      char *ptr1 = &strClockSetting[len];      
-      for (int i=0; i<6; i++)
-      {
-        char *ptr2 = strchr(ptr1,',');
-        if (ptr2 != 0)
-        {
-          *ptr2 = '\0';
-          iDateTime[i] = atoi(ptr1);
-          ptr1 = &ptr2[1];
-        }
-        else
-        {
-          break;
-        }
-      }
-        
-   // NOTE: this will not set time to something earlier than current RTC
-      rtc.adjust(DateTime(iDateTime[0],iDateTime[1],iDateTime[2],iDateTime[3],iDateTime[4],iDateTime[5]));
     }
     fileSDCard.close();
   } 
