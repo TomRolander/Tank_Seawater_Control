@@ -241,7 +241,7 @@ void loop()
       case (B00000010):   // Tank level low opening bypass
         digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO0 to open bypass valve
         digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve
-// UVtimer ??  TBD
+// UVtimer ??  TBD Ask John Lee about this?
         cStatus = F("Lo  Opn Bp");
         break;
         
