@@ -9,25 +9,25 @@
             Tom Rolander
 */
 
-#define MODIFIED "2019-02-11"
-#define VERSION "0.6"
+#define MODIFIED "2019-02-25"
+#define VERSION "0.8"
+
 
 #define LED_VERSION false
-#define FORCE_ONE_MINUTE_LOGGING true
 
 #define DELAY_DIN_CHECKING_SEC  5
-#define DELAY_LOGGING_MIN 1
 #define DELAY_UVTIMER_SEC 900
 
-bool bForceOneMinuteLogging = FORCE_ONE_MINUTE_LOGGING;
+bool bForceOneMinuteLogging; // If you remove this line the Arduino IDE compile will fail !!??
+
+bool bSDLogFail = false;
+int  iToggle = 0;
 
 long tickCounterSec = 0;
-int  nextLoggingMin = 0;
 
 int UVtimer = 0;
 int UVtimerMax = DELAY_UVTIMER_SEC / DELAY_DIN_CHECKING_SEC;
-
-bool bSDLogging = true;
+bool bTurnOnUV = false;
 
 // Date and time functions using a DS1307 RTC connected via I2C and Wire lib
 #include <Wire.h>
@@ -57,23 +57,23 @@ File fileSDCard;
 #define dataPin74HC595  1  //Pin connected to data in (DS) of 74HC595
 
 /*  Data In and corresponding Data Out states for Tank Seawater Control
-Din3 Din2 Din1 Din0  Dout5 Dout4 Dout3 Dout2 Dout1 Dout0     
-0    0    0    0     1     1     x     x     1     x     Wtr lvl between the high and low levels, this is the normal case  
-0    0    0    1     0     0     x     0     1     x     Error: shut off the pump, flash the light 
-0    0    1    0     0     x     x     x     1     1     Wtr lvl low  open the bypass valve to raise the Wtr lvl 
-0    0    1    1     0     0     x     0     1     1     Wtr lvl very low, shut off the pump, flash the light  
-0    1    0    0     0     x     1     1     x     0     Wtr lvl high,  close the bypass valve to lower the Wtr lvl 
-0    1    0    1     0     0     x     x     x     x     Error: shut off the pump, flash the light 
-0    1    1    0     0     0     x     x     x     x     Error: flash the light 
-0    1    1    1     0     0     x     x     x     x     Error: shut off the pump  flash the light  
-1    0    0    0     0     0     1     1     0     0     Error: turn off the incoming water, flash the light  
-1    0    0    1     0     0     x     x     x     x     Error: shut off the pump, flash the light 
-1    0    1    0     0     0     x     x     x     x     Error: flash the light 
-1    0    1    1     0     0     x     x     x     x     Error: shut off the pump, flash the light 
-1    1    0    0     0     0     1     1     0     0     Wtr lvl very high, incoming water off, flash the light, clogged filters?
-1    1    0    1     0     0     x     x     x     x     Error: shut off the pump, flash the light  
-1    1    1    0     0     0     x     x     x     x     Error: flash the light 
-1    1    1    1     0     0     x     x     x     x     Error: shut off the pump, flash the light  
+Din3 Din2 Din1 Din0  Dout4 Dout3 Dout2 Dout1 Dout0     
+0    0    0    0     1     x     x     1     x     Wtr lvl between the high and low levels, this is the normal case  
+0    0    0    1     0     x     0     1     x     Error: shut off the pump, flash the light 
+0    0    1    0     x     x     x     1     1     Wtr lvl low  open the bypass valve to raise the Wtr lvl 
+0    0    1    1     0     x     0     1     1     Wtr lvl very low, shut off the pump, flash the light  
+0    1    0    0     x     1     1     x     0     Wtr lvl high,  close the bypass valve to lower the Wtr lvl 
+0    1    0    1     0     x     x     x     x     Error: shut off the pump, flash the light 
+0    1    1    0     0     x     x     x     x     Error: flash the light 
+0    1    1    1     0     x     x     x     x     Error: shut off the pump  flash the light  
+1    0    0    0     0     1     1     0     0     Error: turn off the incoming water, flash the light  
+1    0    0    1     0     x     x     x     x     Error: shut off the pump, flash the light 
+1    0    1    0     0     x     x     x     x     Error: flash the light 
+1    0    1    1     0     x     x     x     x     Error: shut off the pump, flash the light 
+1    1    0    0     0     1     1     0     0     Wtr lvl very high, incoming water off, flash the light, clogged filters?
+1    1    0    1     0     x     x     x     x     Error: shut off the pump, flash the light  
+1    1    1    0     0     x     x     x     x     Error: flash the light 
+1    1    1    1     0     x     x     x     x     Error: shut off the pump, flash the light  
 */
 
 /*
@@ -102,9 +102,8 @@ Dout  Description    Value
 #define DOUT2 B00000100   // Discharge / Output Pump
 #define DOUT3 B00001000   // UV Sterilizers
 #define DOUT4 B00010000   // Flashing Light
-#define DOUT5 B00100000   // Green all OK LED
 
-int digitalOutputState = DOUT0 | DOUT1 | DOUT2 | DOUT3 | DOUT4 | DOUT5;  // Value to show in the 6 LEDs and relay drivers
+int digitalOutputState = DOUT0 | DOUT1 | DOUT2 | DOUT3 | DOUT4;  // Value to show in the 5 LEDs and relay drivers
 
 // NOTE: Using Version 1.0.6
 //       Compile/Link FAILS with Version 1.0.7
@@ -180,8 +179,6 @@ void setup()
   LCDPrintTwoDigits(now.minute());
   delay(2000);
 
-  nextLoggingMin = (now.minute() + DELAY_LOGGING_MIN) % 60;
-  
   // initialize the DIP Switch 4 position pins as an input using the internal pullups:
   pinMode(Din0, INPUT_PULLUP);
   pinMode(Din1, INPUT_PULLUP);
@@ -202,7 +199,6 @@ void setup()
 
 void loop() 
 {
-  bool bLogged = false;
   const __FlashStringHelper *cStatus;
 
 // NOTE: Consider running the loop() on a 1 second timer interrupt instead of a delay of 1 second
@@ -210,15 +206,14 @@ void loop()
   
   DateTime now = rtc.now();
 
+  bTurnOnUV = false;
+
   if ((tickCounterSec % DELAY_DIN_CHECKING_SEC) == 0)
   {
     // Sample digital inputs and set digital outputs approximately every 5 seconds
     
     digitalInputState_New = SampleDigitalInputs();
   
-    bLogged = true;
-    digitalOutputState = digitalOutputState & (~DOUT5);     // send zero to DO5 to turn off green LED
-    
     switch (digitalInputState_New)
     {
       case (B00000000):   // Water level between the high and low levels, this is the normal case
@@ -226,7 +221,6 @@ void loop()
                           //       or closed if high level switch hit last
         digitalOutputState = digitalOutputState | DOUT1;    // send one to DO1 to open inlet valve
         digitalOutputState = digitalOutputState | DOUT4;    // send one to DO4 to turn off flashing
-        digitalOutputState = digitalOutputState | DOUT5;    // send one to DO5 to turn on green LED
         cStatus = F("Tnk Normal");
         break;
         
@@ -257,7 +251,8 @@ void loop()
       case (B00000100):   // Tank level high closing bypass
         digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
         digitalOutputState = digitalOutputState | DOUT2;    // send one to DO2 to turn on the pump
-        digitalOutputState = digitalOutputState | DOUT3;    // send one to DO3 to turn on the UV
+        if ((digitalOutputState & DOUT3) != DOUT3)
+          bTurnOnUV = true;
         cStatus = F("Hi  Cls Bp");
         UVtimer = 0;
         break;
@@ -266,7 +261,8 @@ void loop()
         digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
         digitalOutputState = digitalOutputState & (~DOUT1); // send zero to DO1 to close input valve
         digitalOutputState = digitalOutputState | DOUT2;    // send one to DO2 to turn on the pump
-        digitalOutputState = digitalOutputState | DOUT3;    // send one to DO3 to turn on the UV
+        if ((digitalOutputState & DOUT3) != DOUT3)
+          bTurnOnUV = true;
         digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
         cStatus = F("FLT SW ERR");
         UVtimer = 0;
@@ -276,7 +272,8 @@ void loop()
         digitalOutputState = digitalOutputState & (~DOUT0); // send zero to DO0 to close bypass valve
         digitalOutputState = digitalOutputState & (~DOUT1); // send zero to DO1 to close input valve
         digitalOutputState = digitalOutputState | DOUT2;    // send one to DO2 to turn on the pump
-        digitalOutputState = digitalOutputState | DOUT3;    // send one to DO3 to turn on the UV
+        if ((digitalOutputState & DOUT3) != DOUT3)
+          bTurnOnUV = true;
         digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
         cStatus = F("HI! CkFilt");
         UVtimer = 0;
@@ -290,12 +287,6 @@ void loop()
 
     LCDDigitalOutputUpdate();
     
-    if ((digitalInputState_New != digitalInputState_Saved) || bSDLogging == false)
-    {
-      digitalInputState_Saved = digitalInputState_New;
-      LCDStatusUpdate_SDLogging(cStatus);
-    }
-
     // Turn off UV sterilizers when discharge pump is off for more than 15 minutes
     if (UVtimer > UVtimerMax)
     {
@@ -306,7 +297,20 @@ void loop()
         LCDDigitalOutputUpdate();
         LCDStatusUpdate_SDLogging(F("UV is OFF "));
       }
-    }    
+    }
+
+    if (bTurnOnUV)
+    {
+        digitalOutputState = digitalOutputState | DOUT3;      // send one to DO3 to turn on the UV
+        LCDDigitalOutputUpdate();
+        LCDStatusUpdate_SDLogging(F("UV is ON  "));
+    }
+
+    if ((digitalInputState_New != digitalInputState_Saved) || bSDLogFail || bTurnOnUV)
+    {
+      digitalInputState_Saved = digitalInputState_New;
+      LCDStatusUpdate_SDLogging(cStatus);
+    }
   }
 
   SetDigitalOutputState();
@@ -319,13 +323,6 @@ void loop()
      lcd.print(":");
   else
      lcd.print(" ");
-
-  if (now.minute() == nextLoggingMin)
-  {
-    nextLoggingMin = (now.minute() + DELAY_LOGGING_MIN) % 60;
-    if (bLogged == false)
-      LCDStatusUpdate_SDLogging(F(""));
-  }
 }
 
 // Read all 4 float switches
@@ -430,7 +427,7 @@ void SetupSDCardOperations()
     fileSDCard = SD.open("LOGGING.CSV", FILE_WRITE);
     if (fileSDCard) 
     {
-      fileSDCard.println(F("\"Date\",\"Time\",\"DOut\",\"Din\",\"Status\""));
+      fileSDCard.println(F("\"Date\",\"Time\",\"Dout\",\"Din\",\"Status\""));
       fileSDCard.close();
     }
     else
@@ -470,14 +467,19 @@ void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
 
   if (!SD.begin(chipSelectSDCard)) 
   {
-    lcd.setCursor(0, 1);
-    lcd.print(F("SD LogFail"));
-    bSDLogging = false;
+    bSDLogFail = true;
+    iToggle++;
+    if ((iToggle & B00000001) == 0)
+    {
+      lcd.setCursor(0, 1);
+      lcd.print(F("SD LogFail"));
+    }
     return;
   }
-  bSDLogging = true;
+  bSDLogFail = false;
+  iToggle = 0;
 
-  if ((strcmp((const char*) status, "") != 0) || bForceOneMinuteLogging)
+//  if ((strcmp((const char*) status, "") != 0) || bForceOneMinuteLogging)
   {
     fileSDCard = SD.open("LOGGING.CSV", FILE_WRITE);
   
@@ -496,7 +498,11 @@ void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
       fileSDCard.print(":");
       fileSDCard.print(now.second(), DEC);
       fileSDCard.print(",");
-      SDPrintBinary(digitalOutputState ^ DOUT4,6);  // toggle sense of flashing light state
+#if LED_VERSION
+      SDPrintBinary(digitalOutputState ^ DOUT4,5);  // toggle sense of flashing light state
+#else
+      SDPrintBinary(digitalOutputState,5);
+#endif
       fileSDCard.print(",");
       SDPrintBinary(digitalInputState_Saved,4);
       fileSDCard.print(",");
