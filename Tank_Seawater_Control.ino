@@ -9,9 +9,8 @@
             Tom Rolander
 */
 
-#define MODIFIED "2019-02-25"
-#define VERSION "0.8"
-
+#define MODIFIED "2019-04-04"
+#define VERSION "0.9"
 
 #define LED_VERSION false
 
