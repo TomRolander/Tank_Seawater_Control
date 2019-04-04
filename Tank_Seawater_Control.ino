@@ -320,9 +320,22 @@ void loop()
 // Flash the colon in the time display every second
   lcd.setCursor(13,1);
   if ((tickCounterSec & B00000001) == B00000001)
+  {
      lcd.print(":");
+  }
   else
-     lcd.print(" ");
+  {
+    lcd.print(" ");
+
+    // Set upper right corner LCD to input switch value in Hex on even seconds
+    lcd.setCursor(15, 0);
+    char digitalInputDisplay;
+    if (digitalInputState_Saved < 10)
+      digitalInputDisplay = '0' + digitalInputState_Saved;
+    else
+      digitalInputDisplay = 'A' + (digitalInputState_Saved-10);    
+    lcd.write(digitalInputDisplay);  
+  }
 }
 
 // Read all 4 float switches
