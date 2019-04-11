@@ -9,7 +9,7 @@
             Tom Rolander
 */
 
-#define MODIFIED "2019-04-04"
+#define MODIFIED "2019-04-11"
 #define VERSION "0.9"
 
 #define LED_VERSION false
@@ -17,7 +17,7 @@
 #define DELAY_DIN_CHECKING_SEC  5
 #define DELAY_UVTIMER_SEC 900
 
-bool bForceOneMinuteLogging; // If you remove this line the Arduino IDE compile will fail !!??
+//bool bForceOneMinuteLogging; // If you remove this line the Arduino IDE compile will fail !!??
 
 bool bSDLogFail = false;
 int  iToggle = 0;
@@ -320,7 +320,9 @@ void loop()
   lcd.setCursor(13,1);
   if ((tickCounterSec & B00000001) == B00000001)
   {
-     lcd.print(":");
+    lcd.print(":");
+    lcd.setCursor(15, 0);
+    lcd.write(' ');  
   }
   else
   {
@@ -573,11 +575,13 @@ void LCDDigitalOutputUpdate()
   if ((digitalOutputState & DOUT3) == 0)
     lcd.write('0');
   else
-    lcd.write('1');  
+    lcd.write('1');
+#if 0  // Disable asterisk display in upper right LCD when alarm on
   if ((digitalOutputState & DOUT4) != DOUT4)
     lcd.write('*');
   else
     lcd.write(' ');    
+#endif
 }
 
 void SetDigitalOutputState()
