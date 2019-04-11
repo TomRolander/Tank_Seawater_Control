@@ -12,8 +12,6 @@
 #define MODIFIED "2019-04-11"
 #define VERSION "0.9"
 
-#define LED_VERSION false
-
 #define DELAY_DIN_CHECKING_SEC  5
 #define DELAY_UVTIMER_SEC 900
 
@@ -168,13 +166,13 @@ void setup()
   lcd.print(F("*** DATE ***    "));
   lcd.setCursor(0, 1);
   lcd.print(now.year(), DEC);
-  lcd.print("/");
+  lcd.print(F("/"));
   LCDPrintTwoDigits(now.month());
-  lcd.print("/");
+  lcd.print(F("/"));
   LCDPrintTwoDigits(now.day());
-  lcd.print(" ");
+  lcd.print(F(" "));
   LCDPrintTwoDigits(now.hour());
-  lcd.print(":");
+  lcd.print(F(":"));
   LCDPrintTwoDigits(now.minute());
   delay(2000);
 
@@ -320,13 +318,13 @@ void loop()
   lcd.setCursor(13,1);
   if ((tickCounterSec & B00000001) == B00000001)
   {
-    lcd.print(":");
+    lcd.print(F(":"));
     lcd.setCursor(15, 0);
     lcd.write(' ');  
   }
   else
   {
-    lcd.print(" ");
+    lcd.print(F(" "));
 
     // Set upper right corner LCD to input switch value in Hex on even seconds
     lcd.setCursor(15, 0);
@@ -474,7 +472,7 @@ void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
 
   DateTime now = rtc.now();      
   lcd.setCursor(10,1);
-  lcd.print(" ");
+  lcd.print(F(" "));
   LCDPrintTwoDigits(now.hour());
   lcd.setCursor(14,1);
   LCDPrintTwoDigits(now.minute());   
@@ -512,11 +510,7 @@ void LCDStatusUpdate_SDLogging(const __FlashStringHelper*status)
       fileSDCard.print(":");
       fileSDCard.print(now.second(), DEC);
       fileSDCard.print(",");
-#if LED_VERSION
-      SDPrintBinary(digitalOutputState ^ DOUT4,5);  // toggle sense of flashing light state
-#else
       SDPrintBinary(digitalOutputState,5);
-#endif
       fileSDCard.print(",");
       SDPrintBinary(digitalInputState_Saved,4);
       fileSDCard.print(",");
@@ -550,7 +544,7 @@ void LCDDigitalOutputUpdate()
 {
   DateTime now = rtc.now();      
   lcd.setCursor(10,1);
-  lcd.print(" ");
+  lcd.print(F(" "));
   LCDPrintTwoDigits(now.hour());
   lcd.setCursor(14,1);
   LCDPrintTwoDigits(now.minute());   
@@ -587,16 +581,6 @@ void LCDDigitalOutputUpdate()
 void SetDigitalOutputState()
 {
   int iOutput = digitalOutputState;
-#if LED_VERSION
-  if ((iOutput & DOUT4) != DOUT4)
-  {
-    if ((tickCounterSec & B00000001) == B00000001)
-       iOutput = iOutput | DOUT4;
-    else
-       iOutput = iOutput & (~DOUT4);
-  }
-  iOutput = iOutput ^ DOUT4;
-#endif
   digitalWrite(latchPin74HC595, LOW);          //Pull latch LOW to start sending data
   shiftOut(dataPin74HC595, clockPin74HC595, MSBFIRST, iOutput);         //Send the data
   digitalWrite(latchPin74HC595, HIGH);         //Pull latch HIGH to stop sending data
@@ -605,7 +589,7 @@ void SetDigitalOutputState()
 void LCDPrintTwoDigits(int iVal)
 {
   if (iVal < 10)
-    lcd.print("0");
+    lcd.print(F("0"));
   lcd.print(iVal, DEC);
 }
 
