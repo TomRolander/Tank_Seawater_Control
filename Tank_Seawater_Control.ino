@@ -9,7 +9,7 @@
             Tom Rolander
 */
 
-#define MODIFIED "2019-04-11"
+#define MODIFIED "2019-04-15"
 #define VERSION "0.9"
 
 #define DELAY_DIN_CHECKING_SEC  5
@@ -115,6 +115,8 @@ LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 int digitalInputState_Saved = B11111111;
 int digitalInputState_New;
 
+// Proc to reset the Arduino
+void (* re_set)(void) = 0x00;
 
 void setup() 
 {
@@ -335,6 +337,15 @@ void loop()
       digitalInputDisplay = 'A' + (digitalInputState_Saved-10);    
     lcd.write(digitalInputDisplay);  
   }
+
+  // Detect time 12:00:0? and re_set()
+  if (now.hour() == 11 &&
+      now.minute() == 0 &&
+      now.second() < 10)
+      {
+        delay(10000);
+        re_set();
+      }
 }
 
 // Read all 4 float switches
