@@ -339,7 +339,7 @@ void loop()
   }
 
   // Detect time 12:00:0? and re_set()
-  if (now.hour() == 11 &&
+  if (now.hour() == 12 &&
       now.minute() == 0 &&
       now.second() < 10)
       {
