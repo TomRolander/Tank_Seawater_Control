@@ -316,6 +316,19 @@ void loop()
   
   tickCounterSec++;
 
+#if 1
+  // Every minute clear the LCD and redisplay
+  if (now.minute() == 0 &&
+      now.second() == 0)
+      {
+        lcd.clear();
+        lcd.setCursor(0, 1);
+        lcd.print(cStatus);
+        LCDDigitalOutputUpdate();
+        delay(1000);
+      }
+#endif
+
 // Flash the colon in the time display every second
   lcd.setCursor(13,1);
   if ((tickCounterSec & B00000001) == B00000001)
@@ -338,6 +351,7 @@ void loop()
     lcd.write(digitalInputDisplay);  
   }
 
+#if 1
   // Detect time 12:00:0? and re_set()
   if (now.hour() == 12 &&
       now.minute() == 0 &&
@@ -347,6 +361,7 @@ void loop()
         re_set();
       }
 }
+#endif
 
 // Read all 4 float switches
 // Note: with pullups the state is active low
