@@ -9,7 +9,7 @@
             Tom Rolander
 */
 
-#define MODIFIED "2019-04-15"
+#define MODIFIED "2019-04-18"
 #define VERSION "0.9"
 
 #define DELAY_DIN_CHECKING_SEC  5
@@ -318,14 +318,13 @@ void loop()
 
 #if 1
   // Every minute clear the LCD and redisplay
-  if (now.minute() == 0 &&
-      now.second() == 0)
+  if (now.second() == 0)
       {
         lcd.clear();
         lcd.setCursor(0, 1);
         lcd.print(cStatus);
-        LCDDigitalOutputUpdate();
-        delay(1000);
+//        LCDDigitalOutputUpdate();
+//        delay(1000);
       }
 #endif
 
