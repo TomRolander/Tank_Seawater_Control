@@ -9,7 +9,7 @@
             Tom Rolander
 */
 
-#define MODIFIED "2019-05-06"
+#define MODIFIED "2019-04-18"
 #define VERSION "0.9"
 
 #define DELAY_DIN_CHECKING_SEC  5
@@ -120,8 +120,6 @@ void (* re_set)(void) = 0x00;
 
 void setup() 
 {
-  Wire.begin(); // fix weird characters in LCD display?
-  
   // Immediately set the state of the DOUT's
   Setup_74HC595();
   
