@@ -12,6 +12,8 @@
 #define MODIFIED "2019-05-06"
 #define VERSION "0.9"
 
+#define RESET_HOUR  6
+
 #define DELAY_DIN_CHECKING_SEC  5
 #define DELAY_UVTIMER_SEC 900
 
@@ -353,8 +355,8 @@ void loop()
   }
 
 #if 1
-  // Detect time 12:00:0? and re_set()
-  if (now.hour() == 12 &&
+  // Detect time RESET_HOUR:00:0? and re_set()
+  if (now.hour() == RESET_HOUR &&
       now.minute() == 0 &&
       now.second() < 10)
       {
