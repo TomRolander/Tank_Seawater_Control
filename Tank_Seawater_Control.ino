@@ -9,7 +9,7 @@
             Tom Rolander
 */
 
-#define MODIFIED "2019-05-07"
+#define MODIFIED "2019-05-15"
 #define VERSION "0.9"
 
 #define RESET_HOUR  6
