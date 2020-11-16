@@ -9,7 +9,7 @@
             Tom Rolander
 */
 
-#define MODIFIED "2020-11-16"
+#define MODIFIED "2019-05-15"
 #define VERSION "0.9"
 
 #define RESET_HOUR  6
@@ -23,10 +23,6 @@ bool bSDLogFail = false;
 int  iToggle = 0;
 
 long tickCounterSec = 0;
-unsigned long tickCounterMilliseconds = 0;
-
-#define SLOW_DSCHG_MINUTES  10L
-#define SLOW_DSCHG_MILLISECONDS (SLOW_DSCHG_MINUTES * 60L * 1000L)
 
 int UVtimer = 0;
 int UVtimerMax = DELAY_UVTIMER_SEC / DELAY_DIN_CHECKING_SEC;
@@ -220,7 +216,7 @@ void loop()
     // Sample digital inputs and set digital outputs approximately every 5 seconds
     
     digitalInputState_New = SampleDigitalInputs();
-
+  
     switch (digitalInputState_New)
     {
       case (B00000000):   // Water level between the high and low levels, this is the normal case
@@ -292,23 +288,6 @@ void loop()
         break;
     }
 
-    if ((digitalInputState_New & B00000100) != B00000100)
-      tickCounterMilliseconds = 0;
-    else
-    {
-      if (tickCounterMilliseconds == 0)
-        tickCounterMilliseconds = millis();
-      else
-      {
-        // Previously detected Tank level high
-//        if (millis() > (tickCounterMilliseconds + (unsigned long) SLOW_DSCHG_MILLISECONDS))
-        if (millis() > (tickCounterMilliseconds + 600000L))
-        {
-          digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
-          cStatus = F("SLOW DsChg");        
-        }
-      }
-    }  
     LCDDigitalOutputUpdate();
     
     // Turn off UV sterilizers when discharge pump is off for more than 15 minutes
