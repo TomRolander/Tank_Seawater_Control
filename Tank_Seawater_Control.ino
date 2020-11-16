@@ -9,7 +9,7 @@
             Tom Rolander
 */
 
-#define MODIFIED "2019-05-07"
+#define MODIFIED "2020-11-16"
 #define VERSION "0.9"
 
 #define RESET_HOUR  6
@@ -23,6 +23,10 @@ bool bSDLogFail = false;
 int  iToggle = 0;
 
 long tickCounterSec = 0;
+unsigned long tickCounterMilliseconds = 0;
+
+#define SLOW_DSCHG_MINUTES  10
+#define SLOW_DSCHG_MILLISECONDS (SLOW_DSCHG_MINUTES * 60 * 1000)
 
 int UVtimer = 0;
 int UVtimerMax = DELAY_UVTIMER_SEC / DELAY_DIN_CHECKING_SEC;
@@ -202,7 +206,7 @@ void setup()
 
 void loop() 
 {
-  const __FlashStringHelper *cStatus;
+  const __FlashStringHelper *cStatus = 0;
 
 // NOTE: Consider running the loop() on a 1 second timer interrupt instead of a delay of 1 second
   delay(1000);
@@ -216,6 +220,23 @@ void loop()
     // Sample digital inputs and set digital outputs approximately every 5 seconds
     
     digitalInputState_New = SampleDigitalInputs();
+
+    if (digitalInputState_New != B00000100 &&
+        digitalInputState_New != B00001100)
+      tickCounterMilliseconds = 0;
+    else
+    if (tickCounterMilliseconds == 0)
+      tickCounterMilliseconds = millis();
+    else
+    if ((digitalInputState_New & B00000100) == B00000100)
+    {
+      // Previously detected Tank level high
+      if (millis() > (tickCounterMilliseconds + SLOW_DSCHG_MILLISECONDS))
+      {
+        digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
+        cStatus = F("SLOW DsChg");        
+      }
+    }
   
     switch (digitalInputState_New)
     {
@@ -256,7 +277,8 @@ void loop()
         digitalOutputState = digitalOutputState | DOUT2;    // send one to DO2 to turn on the pump
         if ((digitalOutputState & DOUT3) != DOUT3)
           bTurnOnUV = true;
-        cStatus = F("Hi  Cls Bp");
+        if (cStatus == 0)
+          cStatus = F("Hi  Cls Bp");
         UVtimer = 0;
         break;
         
@@ -278,7 +300,8 @@ void loop()
         if ((digitalOutputState & DOUT3) != DOUT3)
           bTurnOnUV = true;
         digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
-        cStatus = F("HI! CkFilt");
+        if (cStatus == 0)
+          cStatus = F("HI! CkFilt");
         UVtimer = 0;
         break;
         
