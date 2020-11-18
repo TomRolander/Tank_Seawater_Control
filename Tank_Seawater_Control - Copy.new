@@ -9,7 +9,7 @@
             Tom Rolander
 */
 
-#define MODIFIED "2020-11-18"
+#define MODIFIED "2020-11-16"
 #define VERSION "0.9"
 
 #define RESET_HOUR  6
@@ -22,13 +22,11 @@
 bool bSDLogFail = false;
 int  iToggle = 0;
 
-bool bSlowDischarge = false;
-
 long tickCounterSec = 0;
 unsigned long tickCounterMilliseconds = 0;
 
-#define SLOW_DSCHG_MINUTES  10L
-#define SLOW_DSCHG_MILLISECONDS (SLOW_DSCHG_MINUTES * 60L * 1000L)
+#define SLOW_DSCHG_MINUTES  10
+#define SLOW_DSCHG_MILLISECONDS (SLOW_DSCHG_MINUTES * 60 * 1000)
 
 int UVtimer = 0;
 int UVtimerMax = DELAY_UVTIMER_SEC / DELAY_DIN_CHECKING_SEC;
@@ -208,7 +206,7 @@ void setup()
 
 void loop() 
 {
-  const __FlashStringHelper *cStatus;
+  const __FlashStringHelper *cStatus = 0;
 
 // NOTE: Consider running the loop() on a 1 second timer interrupt instead of a delay of 1 second
   delay(1000);
@@ -223,6 +221,23 @@ void loop()
     
     digitalInputState_New = SampleDigitalInputs();
 
+    if (digitalInputState_New != B00000100 &&
+        digitalInputState_New != B00001100)
+      tickCounterMilliseconds = 0;
+    else
+    if (tickCounterMilliseconds == 0)
+      tickCounterMilliseconds = millis();
+    else
+    if ((digitalInputState_New & B00000100) == B00000100)
+    {
+      // Previously detected Tank level high
+      if (millis() > (tickCounterMilliseconds + SLOW_DSCHG_MILLISECONDS))
+      {
+        digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
+        cStatus = F("SLOW DsChg");        
+      }
+    }
+  
     switch (digitalInputState_New)
     {
       case (B00000000):   // Water level between the high and low levels, this is the normal case
@@ -262,7 +277,8 @@ void loop()
         digitalOutputState = digitalOutputState | DOUT2;    // send one to DO2 to turn on the pump
         if ((digitalOutputState & DOUT3) != DOUT3)
           bTurnOnUV = true;
-        cStatus = F("Hi  Cls Bp");
+        if (cStatus == 0)
+          cStatus = F("Hi  Cls Bp");
         UVtimer = 0;
         break;
         
@@ -284,7 +300,8 @@ void loop()
         if ((digitalOutputState & DOUT3) != DOUT3)
           bTurnOnUV = true;
         digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
-        cStatus = F("HI! CkFilt");
+        if (cStatus == 0)
+          cStatus = F("HI! CkFilt");
         UVtimer = 0;
         break;
         
@@ -294,32 +311,6 @@ void loop()
         break;
     }
 
-    if ((digitalInputState_New & B00000100) != B00000100)
-    {
-      tickCounterMilliseconds = 0;
-      bSlowDischarge = false;
-    }
-    else
-    {
-      if (tickCounterMilliseconds == 0)
-        tickCounterMilliseconds = millis();
-      else
-      {
-        // Previously detected Tank level high
-// NOTE: the Arduino IDE compiler fails to correctly do the unsigned long constant math on the following line ?!
-//        if (millis() > (tickCounterMilliseconds + (unsigned long) SLOW_DSCHG_MILLISECONDS))
-        if (millis() > (tickCounterMilliseconds + 600000L))
-        {
-          digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
-          if (bSlowDischarge == false)
-          {
-            cStatus = F("SLOW DsChg");        
-            LCDStatusUpdate_SDLogging(cStatus);
-            bSlowDischarge = true;
-          }
-        }
-      }
-    }  
     LCDDigitalOutputUpdate();
     
     // Turn off UV sterilizers when discharge pump is off for more than 15 minutes
