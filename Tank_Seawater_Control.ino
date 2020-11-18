@@ -9,7 +9,7 @@
             Tom Rolander
 */
 
-#define MODIFIED "2020-11-16"
+#define MODIFIED "2020-11-18"
 #define VERSION "0.9"
 
 #define RESET_HOUR  6
@@ -21,6 +21,8 @@
 
 bool bSDLogFail = false;
 int  iToggle = 0;
+
+bool bSlowDischarge = false;
 
 long tickCounterSec = 0;
 unsigned long tickCounterMilliseconds = 0;
@@ -214,6 +216,7 @@ void loop()
   DateTime now = rtc.now();
 
   bTurnOnUV = false;
+  bSlowDischarge = false;
 
   if ((tickCounterSec % DELAY_DIN_CHECKING_SEC) == 0)
   {
@@ -301,11 +304,13 @@ void loop()
       else
       {
         // Previously detected Tank level high
+// NOTE: the Arduino IDE compiler fails to correctly do the unsigned long constant math on the following line ?!
 //        if (millis() > (tickCounterMilliseconds + (unsigned long) SLOW_DSCHG_MILLISECONDS))
         if (millis() > (tickCounterMilliseconds + 600000L))
         {
           digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
           cStatus = F("SLOW DsChg");        
+          bSlowDischarge = true;
         }
       }
     }  
@@ -330,7 +335,7 @@ void loop()
         LCDStatusUpdate_SDLogging(F("UV is ON  "));
     }
 
-    if ((digitalInputState_New != digitalInputState_Saved) || bSDLogFail || bTurnOnUV)
+    if ((digitalInputState_New != digitalInputState_Saved) || bSDLogFail || bTurnOnUV || bSlowDischarge)
     {
       digitalInputState_Saved = digitalInputState_New;
       LCDStatusUpdate_SDLogging(cStatus);
