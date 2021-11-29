@@ -9,7 +9,7 @@
             Tom Rolander
 */
 
-#define MODIFIED "2020-11-18"
+#define MODIFIED "2021-11-29"
 #define VERSION "0.9"
 
 #define RESET_HOUR  6
@@ -26,6 +26,10 @@ bool bSlowDischarge = false;
 
 long tickCounterSec = 0;
 unsigned long tickCounterMilliseconds = 0;
+unsigned long tickCounterMillisecondsBottomSwitch = 0;
+
+#define TIMER_BOTTOM_SWITCH_MINUTES 5L 
+#define TIMER_BOTTOM_SWITCH_DELAY_MS (TIMER_BOTTOM_SWITCH_MINUTES * 60L * 1000L)
 
 #define SLOW_DSCHG_MINUTES  10L
 #define SLOW_DSCHG_MILLISECONDS (SLOW_DSCHG_MINUTES * 60L * 1000L)
@@ -230,6 +234,7 @@ void loop()
                           //       or closed if high level switch hit last
         digitalOutputState = digitalOutputState | DOUT1;    // send one to DO1 to open inlet valve
         digitalOutputState = digitalOutputState | DOUT4;    // send one to DO4 to turn off flashing
+        tickCounterMillisecondsBottomSwitch = 0;
         cStatus = F("Tnk Normal");
         break;
         
@@ -244,7 +249,9 @@ void loop()
       case (B00000010):   // Tank level low opening bypass
         digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO0 to open bypass valve
         digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve
-// UVtimer ??  TBD Ask John Lee about this?
+        digitalOutputState = digitalOutputState | DOUT4;    // send one to DO4 to turn off flashing
+        tickCounterMillisecondsBottomSwitch = 0;
+        UVtimer = UVtimer + 1;
         cStatus = F("Lo  Opn Bp");
         break;
         
@@ -252,7 +259,19 @@ void loop()
         digitalOutputState = digitalOutputState | DOUT0;    // send one  to DO0 to open bypass valve
         digitalOutputState = digitalOutputState | DOUT1;    // send one  to DO1 to open inlet valve      
         digitalOutputState = digitalOutputState & (~DOUT2); // send zero to DO2 to turn off the pump
-        digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
+        //digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
+        if (tickCounterMillisecondsBottomSwitch == 0)
+        {
+          tickCounterMillisecondsBottomSwitch = millis();
+        }
+        else
+        {
+          if ((tickCounterMillisecondsBottomSwitch + TIMER_BOTTOM_SWITCH_DELAY_MS) < millis())
+          {
+            digitalOutputState = digitalOutputState & (~DOUT4); // send zero to DO4 to turn on flashing
+          }
+        }
+        
         cStatus = F("LO! Pm Off");
         UVtimer = UVtimer + 1;
         break;
